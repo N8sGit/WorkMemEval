@@ -1,0 +1,519 @@
+"""
+Unit tests for SimpleWorkMemAgent and MockLLM.
+
+Tests the baseline agent implementation with comprehensive
+coverage following TDD principles.
+"""
+
+import pytest
+import time
+import asyncio
+from unittest.mock import Mock, MagicMock
+
+from src.agents.simple_agent import SimpleWorkMemAgent, MockLLM
+from src.memory.reference_implementations import SimpleContextMemory
+from src.memory.memory_system import NoMemoryBaseline as NoMemory
+from src.core.plugin_interfaces import PluginCapabilities
+from src.core.action_trace import ActionTracer, ActionType
+from src.core.task_specification import (
+    TaskSpecification, CheckpointSpecification, TaskComplexityMetrics
+)
+
+
+class TestMockLLM:
+    """Test MockLLM functionality"""
+    
+    def setup_method(self):
+        """Setup for each test"""
+        self.llm = MockLLM({'response_delay': 0.0})  # No delay for tests
+    
+    def test_mock_llm_creation(self):
+        """Test creating MockLLM"""
+        assert isinstance(self.llm, MockLLM)
+        assert self.llm.call_count == 0
+        assert self.llm.response_delay == 0.0
+    
+    def test_mock_llm_with_config(self):
+        """Test MockLLM with configuration"""
+        config_llm = MockLLM({
+            'response_delay': 0.5,
+            'model': 'mock-gpt'
+        })
+        assert config_llm.response_delay == 0.5
+        assert config_llm.config['model'] == 'mock-gpt'
+    
+    def test_file_operation_responses(self):
+        """Test LLM responses for file operations"""
+        # Read file responses
+        response = self.llm.generate_response("read file example.py")
+        assert "read the file" in response.lower()
+        assert self.llm.call_count == 1
+        
+        # Write file responses
+        response = self.llm.generate_response("write file output.txt")
+        assert "create the file" in response.lower()
+        assert self.llm.call_count == 2
+        
+        # Edit file responses
+        response = self.llm.generate_response("edit file config.json")
+        assert "make the necessary changes" in response.lower()
+        assert self.llm.call_count == 3
+    
+    def test_implementation_responses(self):
+        """Test LLM responses for implementation tasks"""
+        # Function implementation
+        response = self.llm.generate_response("implement function calculator add")
+        assert "def add" in response
+        assert "return a + b" in response
+        
+        # Class implementation
+        response = self.llm.generate_response("implement class DataProcessor")
+        assert "class ExampleClass" in response
+        assert "def __init__" in response
+    
+    def test_calculator_specific_implementation(self):
+        """Test calculator-specific implementation"""
+        response = self.llm.generate_response("implement calculator functions")
+        assert "def add" in response
+        assert "def multiply" in response
+        assert "return a + b" in response
+        assert "return a * b" in response
+    
+    def test_fibonacci_implementation(self):
+        """Test fibonacci-specific implementation"""
+        response = self.llm.generate_response("implement fibonacci function")
+        assert "def fibonacci" in response
+        assert "fib = [0, 1]" in response
+        assert "fib.append" in response
+    
+    def test_planning_responses(self):
+        """Test planning and analysis responses"""
+        response = self.llm.generate_response("plan the implementation approach")
+        assert "step" in response.lower()
+        assert "1." in response
+        assert "requirements" in response.lower()
+        
+        response = self.llm.generate_response("analyze the code structure")
+        assert "analyze" in response.lower()
+        assert "understand" in response.lower()
+    
+    def test_default_response(self):
+        """Test default response for unmatched patterns"""
+        response = self.llm.generate_response("random unmatched query")
+        assert "understand the task" in response.lower()
+        assert "step by step" in response.lower()
+    
+    def test_call_count_tracking(self):
+        """Test that call count is tracked correctly"""
+        initial_count = self.llm.call_count
+        
+        self.llm.generate_response("test query 1")
+        assert self.llm.call_count == initial_count + 1
+        
+        self.llm.generate_response("test query 2")
+        assert self.llm.call_count == initial_count + 2
+
+
+class TestSimpleWorkMemAgent:
+    """Test SimpleWorkMemAgent functionality"""
+    
+    def setup_method(self):
+        """Setup for each test"""
+        self.memory = SimpleContextMemory({'max_items': 100})
+        self.agent = SimpleWorkMemAgent(self.memory, {
+            'max_iterations': 10,
+            'memory_context_limit': 5,
+            'llm_config': {'response_delay': 0.0}
+        })
+    
+    def test_agent_creation(self):
+        """Test creating SimpleWorkMemAgent"""
+        assert isinstance(self.agent, SimpleWorkMemAgent)
+        assert self.agent.memory_system is self.memory
+        assert self.agent.max_iterations == 10
+        assert self.agent.memory_context_limit == 5
+        assert isinstance(self.agent.llm, MockLLM)
+    
+    def test_agent_capabilities(self):
+        """Test agent capabilities"""
+        caps = self.agent.get_capabilities()
+        assert isinstance(caps, PluginCapabilities)
+        assert caps.supports_search is True
+        assert caps.supports_introspection is True
+        assert caps.supports_embeddings is False
+    
+    def test_file_operations(self):
+        """Test basic file operations"""
+        # Test file creation
+        success = self.agent._create_file("test.py", "print('hello')")
+        assert success is True
+        assert "test.py" in self.agent.file_read_cache
+        assert self.agent.file_read_cache["test.py"] == "print('hello')"
+        
+        # Test file reading
+        success = self.agent._read_file("test.py")
+        assert success is True
+        
+        # Test file editing
+        success = self.agent._edit_file("test.py", "print('world')")
+        assert success is True
+        assert "print('world')" in self.agent.file_read_cache["test.py"]
+    
+    def test_file_exists_check(self):
+        """Test file existence checking"""
+        assert self.agent._file_exists("nonexistent.py") is False
+        
+        self.agent._create_file("exists.py", "content")
+        assert self.agent._file_exists("exists.py") is True
+    
+    def test_mock_file_content_generation(self):
+        """Test generation of mock file content"""
+        # Python files
+        content = self.agent._get_mock_file_content("example.py")
+        assert "# Python file" in content
+        assert "TODO" in content
+        
+        # Text files
+        content = self.agent._get_mock_file_content("readme.txt")
+        assert "Text file" in content
+        
+        # JSON files
+        content = self.agent._get_mock_file_content("config.json")
+        assert '"file"' in content
+        assert "placeholder" in content
+    
+    def test_memory_integration(self):
+        """Test integration with memory system"""
+        # Test storing task context
+        task_spec = self._create_sample_task()
+        self.agent._store_task_context(task_spec)
+        
+        # Check that task was stored in memory
+        results = self.memory.retrieve_information("sample_task", {})
+        assert len(results) > 0
+        
+        # Test storing checkpoint context
+        checkpoint = task_spec.checkpoints[0]
+        self.agent._store_checkpoint_context(checkpoint)
+        
+        results = self.memory.retrieve_information("setup", {})
+        assert len(results) > 0
+    
+    def test_context_retrieval(self):
+        """Test retrieval of relevant context from memory"""
+        # Store some context first
+        self.memory.store_information("test_key", "test_value", {"type": "test"})
+        
+        checkpoint = CheckpointSpecification(
+            checkpoint_id="test_checkpoint",
+            order=1,
+            title="Test Checkpoint",
+            stub_file="test.py",
+            stub_function="test_function",
+            requirements="Test checkpoint with test keyword",
+            test_file="test_test.py",
+            dependencies=[]
+        )
+        
+        context = self.agent._retrieve_relevant_context(checkpoint)
+        assert 'retrieved_items' in context
+        # Should find the item with "test" keyword
+        assert len(context['retrieved_items']) > 0
+    
+    def test_plan_generation(self):
+        """Test execution plan generation"""
+        checkpoint = CheckpointSpecification(
+            checkpoint_id="impl",
+            order=1,
+            title="Calculator Implementation",
+            stub_file="calculator.py",
+            stub_function="Calculator",
+            requirements="Implement calculator functions",
+            test_file="test_calculator.py",
+            dependencies=[]
+        )
+        
+        context = {'retrieved_items': []}
+        plan = self.agent._plan_checkpoint_execution(checkpoint, context)
+        
+        assert isinstance(plan, list)
+        assert len(plan) > 0
+        
+        # Should have steps for each required file
+        file_actions = [step for step in plan if 'file_path' in step]
+        assert len(file_actions) >= 2  # One for each required file
+    
+    def test_plan_parsing(self):
+        """Test parsing of LLM response into execution plan"""
+        checkpoint = CheckpointSpecification(
+            checkpoint_id="test",
+            order=1,
+            title="Test Implementation",
+            stub_file="main.py",
+            stub_function="main",
+            requirements="Test implementation",
+            test_file="test_main.py",
+            dependencies=[]
+        )
+        
+        response = "I will implement the functionality step by step"
+        plan = self.agent._parse_plan_from_response(response, checkpoint)
+        
+        assert isinstance(plan, list)
+        # Should have at least create_file and implement actions
+        actions = [step['action'] for step in plan]
+        assert 'create_file' in actions
+        assert 'implement' in actions
+    
+    def test_step_execution(self):
+        """Test execution of individual plan steps"""
+        # Test read_file step
+        self.agent._create_file("test.py", "content")
+        step = {'action': 'read_file', 'file_path': 'test.py'}
+        success = self.agent._execute_step(step)
+        assert success is True
+        
+        # Test create_file step
+        step = {'action': 'create_file', 'file_path': 'new.py', 'content': 'new content'}
+        success = self.agent._execute_step(step)
+        assert success is True
+        
+        # Test implement step
+        step = {'action': 'implement', 'description': 'calculator functions'}
+        success = self.agent._execute_step(step)
+        assert success is True
+        
+        # Test unknown action
+        step = {'action': 'unknown_action'}
+        success = self.agent._execute_step(step)
+        assert success is False
+    
+    def test_implementation_functionality(self):
+        """Test implementation of functionality"""
+        success = self.agent._implement_functionality("create calculator functions")
+        assert success is True
+        
+        # Should store implementation in memory
+        results = self.memory.retrieve_information("calculator", {})
+        assert len(results) > 0
+    
+    def test_context_formatting(self):
+        """Test formatting of context for prompts"""
+        context = {
+            'retrieved_items': [
+                {'key': 'test1', 'value': 'This is test value 1'},
+                {'key': 'test2', 'value': 'This is test value 2'}
+            ]
+        }
+        
+        formatted = self.agent._format_context_for_prompt(context)
+        assert 'test1' in formatted
+        assert 'test2' in formatted
+        assert 'This is test value 1' in formatted
+        
+        # Test empty context
+        empty_context = {'retrieved_items': []}
+        formatted = self.agent._format_context_for_prompt(empty_context)
+        assert 'No relevant context' in formatted
+    
+    def test_checkpoint_execution(self):
+        """Test execution of a complete checkpoint"""
+        checkpoint = CheckpointSpecification(
+            checkpoint_id="test_checkpoint",
+            order=1,
+            title="Calculator Implementation",
+            stub_file="calculator.py",
+            stub_function="Calculator",
+            requirements="Implement basic calculator",
+            test_file="test_calculator.py",
+            dependencies=[]
+        )
+        
+        # Since execute_checkpoint is now async, we need to run it in an event loop
+        async def run_test():
+            success = await self.agent.execute_checkpoint(checkpoint)
+            return success
+        
+        success = asyncio.run(run_test())
+        assert success is True
+    
+    def test_task_execution(self):
+        """Test execution of a complete task"""
+        # Create a mock action tracer
+        action_tracer = Mock()
+        
+        task_spec = self._create_sample_task()
+        success = self.agent.execute_task(task_spec, action_tracer)
+        assert success is True
+        
+        # Should have stored task context in memory
+        results = self.memory.retrieve_information("sample_task", {})
+        assert len(results) > 0
+    
+    def test_error_handling(self):
+        """Test error handling in various operations"""
+        # Test with a mock that raises an exception
+        original_llm = self.agent.llm
+        self.agent.llm = Mock()
+        self.agent.llm.generate_response.side_effect = Exception("Mock error")
+        
+        success = self.agent._implement_functionality("test")
+        assert success is False
+        
+        # Restore original LLM
+        self.agent.llm = original_llm
+    
+    def test_action_logging(self):
+        """Test that actions are logged correctly"""
+        mock_tracer = Mock()
+        self.agent.action_tracer = mock_tracer
+        
+        # Test logging different action types
+        self.agent._log_action(ActionType.FILE_READ, "test.py")
+        mock_tracer.log_action.assert_called_with(ActionType.FILE_READ, "test.py")
+        
+        self.agent._log_action(ActionType.PLANNING, "Planning step")
+        mock_tracer.log_action.assert_called_with(ActionType.PLANNING, "Planning step")
+    
+    def test_memory_system_integration(self):
+        """Test integration with different memory systems"""
+        # Test with NoMemory
+        no_memory = NoMemory({})
+        no_mem_agent = SimpleWorkMemAgent(no_memory, {})
+        
+        # Should still work, just no memory persistence
+        success = no_mem_agent._implement_functionality("test")
+        assert success is True
+        
+        # NoMemory should show empty retrieval
+        context = no_mem_agent._retrieve_relevant_context(
+            CheckpointSpecification(
+                checkpoint_id="test",
+                order=1,
+                title="Test",
+                stub_file="test.py",
+                stub_function="test",
+                requirements="test requirements",
+                test_file="test_test.py"
+            )
+        )
+        assert len(context['retrieved_items']) == 0
+    
+    def test_behavioral_trace(self):
+        """Test getting behavioral trace from agent"""
+        # Test with no action tracer - should return empty trace
+        trace = self.agent.get_behavioral_trace()
+        assert trace.task_id == "unknown"
+        assert trace.completed_successfully is False
+        
+        # Test with mock action tracer
+        mock_tracer = Mock()
+        mock_trace = Mock()
+        mock_tracer.get_task_trace.return_value = mock_trace
+        self.agent.action_tracer = mock_tracer
+        
+        trace = self.agent.get_behavioral_trace()
+        assert trace is mock_trace
+        mock_tracer.get_task_trace.assert_called_once()
+    
+    def _create_sample_task(self) -> TaskSpecification:
+        """Create a sample task for testing"""
+        checkpoint1 = CheckpointSpecification(
+            checkpoint_id="setup",
+            order=1,
+            title="Setup Calculator",
+            stub_file="calculator.py",
+            stub_function="Calculator",
+            requirements="Set up calculator project structure",
+            test_file="test_calculator.py",
+            dependencies=[]
+        )
+        
+        checkpoint2 = CheckpointSpecification(
+            checkpoint_id="implement",
+            order=2,
+            title="Implement Calculator",
+            stub_file="calculator.py",
+            stub_function="Calculator",
+            requirements="Implement calculator functions",
+            test_file="test_calculator.py",
+            dependencies=["setup"]
+        )
+        
+        return TaskSpecification(
+            task_id="sample_task",
+            title="Simple Calculator",
+            domain="calculator",
+            description="Create a simple calculator",
+            checkpoints=[checkpoint1, checkpoint2],
+            planning_phase=Mock(),
+            repository=Mock(),
+            memory_challenges=[]
+        )
+
+
+class TestAgentMemoryInteraction:
+    """Test agent interaction with different memory systems"""
+    
+    def test_with_simple_memory(self):
+        """Test agent with SimpleContextMemory"""
+        memory = SimpleContextMemory({'max_items': 10})
+        agent = SimpleWorkMemAgent(memory, {})
+        
+        # Store and retrieve information
+        agent._implement_functionality("calculator add function")
+        
+        # Should be able to find the implementation
+        results = memory.retrieve_information("calculator", {})
+        assert len(results) > 0
+    
+    def test_with_no_memory(self):
+        """Test agent with NoMemory system"""
+        memory = NoMemory({})
+        agent = SimpleWorkMemAgent(memory, {})
+        
+        # Should work without errors even with no memory
+        success = agent._implement_functionality("test function")
+        assert success is True
+        
+        # But memory won't retrieve anything
+        context = agent._retrieve_relevant_context(
+            CheckpointSpecification(
+                checkpoint_id="test",
+                order=1,
+                title="Test",
+                stub_file="test.py",
+                stub_function="test",
+                requirements="test requirements",
+                test_file="test_test.py"
+            )
+        )
+        assert len(context['retrieved_items']) == 0
+    
+    def test_memory_context_limiting(self):
+        """Test that memory context is properly limited"""
+        memory = SimpleContextMemory({'max_items': 100})
+        agent = SimpleWorkMemAgent(memory, {'memory_context_limit': 2})
+        
+        # Store multiple items
+        for i in range(5):
+            memory.store_information(f"test_{i}", f"test content {i}", {'type': 'test'})
+        
+        checkpoint = CheckpointSpecification(
+            checkpoint_id="test",
+            order=1,
+            title="Test Checkpoint",
+            stub_file="test.py",
+            stub_function="test_function",
+            requirements="test checkpoint",
+            test_file="test_test.py",
+            dependencies=[]
+        )
+        
+        context = agent._retrieve_relevant_context(checkpoint)
+        # Should be limited by memory_context_limit setting (2 per query, max 4 queries)
+        assert len(context['retrieved_items']) <= 2 * 4  # Max 4 queries * 2 limit each
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])
