@@ -1,0 +1,59 @@
+{
+  "task_id": "simple_calculator",
+  "title": "Simple Calculator Implementation",
+  "domain": "programming",
+  "description": "Implement a basic calculator with addition and multiplication functions, then create a simple API wrapper.",
+  "planning_phase": {
+    "overview_prompt": "Outline how you will implement add, multiply, and a Calculator class, step by step.",
+    "planning_deliverables": {},
+    "planning_capture": {},
+    "max_planning_time_minutes": 5,
+    "required_sections": []
+  },
+  "repository": {
+    "template_name": "simple_calculator",
+    "provided_files": ["calculator.py"],
+    "distractor_files": [],
+    "directory_structure": {"tests": ["test_calculator_cp1.py", "test_calculator_cp2.py", "test_calculator_cp3.py"]},
+    "setup_commands": []
+  },
+  "checkpoints": [
+    {
+      "checkpoint_id": "cp1_add_function",
+      "order": 1,
+      "title": "Addition Function",
+      "stub_file": "calculator.py",
+      "stub_function": "add",
+      "requirements": "Implement an add(a, b) function that returns the sum of two numbers. The function should handle both integers and floating point numbers.",
+      "test_file": "tests/test_calculator_cp1.py",
+      "dependencies": []
+    },
+    {
+      "checkpoint_id": "cp2_multiply_function",
+      "order": 2,
+      "title": "Multiplication Function",
+      "stub_file": "calculator.py",
+      "stub_function": "multiply",
+      "requirements": "Implement a multiply(a, b) function that returns the product of two numbers. The function should handle both integers and floating point numbers and work alongside the existing add function.",
+      "test_file": "tests/test_calculator_cp2.py",
+      "dependencies": ["cp1_add_function"]
+    },
+    {
+      "checkpoint_id": "cp3_calculator_class",
+      "order": 3,
+      "title": "Calculator Class",
+      "stub_file": "calculator.py",
+      "stub_function": "Calculator",
+      "requirements": "Create a Calculator class that encapsulates both add and multiply methods. The class should provide a clean interface for mathematical operations and maintain the functionality of the individual functions.",
+      "test_file": "tests/test_calculator_cp3.py",
+      "dependencies": ["cp1_add_function", "cp2_multiply_function"]
+    }
+  ],
+  "memory_challenges": [],
+  "complexity": {
+    "length": 3,
+    "depth": 2.0,
+    "composition": 1.5
+  },
+  "estimated_duration_minutes": 15
+}
