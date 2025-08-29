@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  eval:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.eval
+    image: workmemeval/eval:local
+    user: "10001:10001"
+    working_dir: /workspace
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    environment:
+      - PYTHONPATH=/workspace:/app
+      - HOME=/workspace
+    volumes:
+      - ../evaluation_workspace:/workspace:rw
+      - ..:/app:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    network_mode: "none"
+    mem_limit: "2g"
+    cpus: "1.0"
+    ulimits:
+      nproc: 512
+      nofile:
+        soft: 1024
+        hard: 2048
+    command: "pytest -q /workspace/tests/test_calculator_cp1.py"
+

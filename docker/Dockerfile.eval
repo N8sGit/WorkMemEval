@@ -1,0 +1,33 @@
+# Container image for WorkMemEval evaluations (tests inside Docker)
+# NOTE: tag this locally as workmemeval/eval:local
+
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+# Create non-root user
+RUN addgroup --system --gid 10001 appgroup && \
+    adduser  --system --uid 10001 --ingroup appgroup --home /home/appuser appuser
+
+# Work directories
+WORKDIR /app
+RUN mkdir -p /workspace && chown -R appuser:appgroup /workspace
+
+# Dependencies (pytest and tooling)
+COPY requirements/ /app/requirements/
+RUN python -m pip install --upgrade pip && \
+    pip install --no-cache-dir -r /app/requirements/dev.txt
+
+# Copy source (mounted read-only at runtime as well)
+COPY src/ /app/src/
+COPY tasks/ /app/tasks/
+COPY templates/ /app/templates/
+
+USER appuser:appgroup
+WORKDIR /workspace
+
+# Use a shell entrypoint to accept commands easily
+ENTRYPOINT ["/bin/sh", "-lc"]
+

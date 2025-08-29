@@ -1,0 +1,14 @@
+# Ignore VCS and local artifacts when building Docker image
+.git
+.github
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.DS_Store
+.env
+.env.*
+evaluation_runs
+node_modules
+

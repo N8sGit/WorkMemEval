@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build eval image
+        run: docker build -f docker/Dockerfile.eval -t workmemeval/eval:ci .
+
+      - name: Run pytest inside container (network disabled)
+        run: |
+          mkdir -p evaluation_workspace/ci
+          docker run --rm \
+            --user 10001:10001 \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
+            --network none \
+            --cpus 1.0 --memory 2g \
+            --security-opt no-new-privileges:true \
+            --cap-drop ALL \
+            -e PYTHONPATH=/workspace:/app \
+            -e HOME=/workspace \
+            -v "$PWD/evaluation_workspace/ci:/workspace:rw" \
+            -v "$PWD:/app:ro" \
+            workmemeval/eval:ci \
+            "pytest -q"
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pre-commit
+        run: pip install pre-commit
+      - name: Run pre-commit
+        run: pre-commit run --all-files
+
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit requirements
+        run: pip-audit -r requirements/dev.txt
+
