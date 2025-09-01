@@ -1,0 +1,66 @@
+{
+  "task_id": "calculator_with_challenges",
+  "title": "Calculator Implementation with Memory Challenges",
+  "domain": "programming",
+  "description": "A basic calculator implementation task with memory challenges to test working memory under stress conditions.",
+  "checkpoints": [
+    {
+      "id": "cp1_add_function",
+      "order": 1,
+      "title": "Addition Function",
+      "stub_file": "calculator.py",
+      "stub_function": "add",
+      "requirements": "Implement an add(a, b) function that returns the sum of two numbers. The function should handle both integers and floating point numbers.",
+      "test_file": "tests/test_calculator_cp1.py"
+    },
+    {
+      "id": "cp2_multiply_function", 
+      "order": 2,
+      "title": "Multiplication Function",
+      "stub_file": "calculator.py",
+      "stub_function": "multiply",
+      "requirements": "Implement a multiply(a, b) function that returns the product of two numbers. The function should handle both integers and floating point numbers and work alongside the existing add function.",
+      "test_file": "tests/test_calculator_cp2.py"
+    },
+    {
+      "id": "cp3_calculator_class",
+      "order": 3,
+      "title": "Calculator Class",
+      "stub_file": "calculator.py",
+      "stub_function": "Calculator",
+      "requirements": "Create a Calculator class that encapsulates both add and multiply methods. The class should provide a clean interface for mathematical operations and maintain the functionality of the individual functions.",
+      "test_file": "tests/test_calculator_cp3.py"
+    }
+  ],
+  "memory_challenges": [
+    {
+      "challenge_id": "info_overload_cp1",
+      "challenge_type": "information_overload",
+      "at_checkpoint": "cp1_add_function",
+      "description": "Add distractor files to test information filtering capabilities",
+      "distractor_files": ["legacy_math.py", "old_calculator.py", "backup_utils.py"]
+    },
+    {
+      "challenge_id": "req_update_cp2",
+      "challenge_type": "requirement_update", 
+      "at_checkpoint": "cp2_multiply_function",
+      "description": "Mid-task requirement change to test adaptation",
+      "metadata": {
+        "update_type": "enhancement",
+        "update_details": "The multiply function must also handle string repetition (e.g., multiply('hello', 3) should return 'hellohellohello')"
+      },
+      "affects": ["cp2_multiply_function"]
+    },
+    {
+      "challenge_id": "context_switch_cp3",
+      "challenge_type": "context_switch",
+      "at_checkpoint": "cp3_calculator_class", 
+      "description": "Brief interruption to test context restoration",
+      "interruption_task": "Write a brief README explaining the calculator's purpose",
+      "duration_minutes": 2
+    }
+  ],
+  "repository": {
+    "template_name": "simple_calculator"
+  }
+}
