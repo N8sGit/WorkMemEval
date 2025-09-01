@@ -83,3 +83,6 @@ class TestRunner:
                 errors=["Test run timed out"],
             )
 
+# Prevent pytest from collecting this production class as a test
+TestRunner.__test__ = False
+

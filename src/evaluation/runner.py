@@ -12,12 +12,14 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 import shutil
 
-from ..core.task_specification import TaskSpecification, CheckpointSpecification
+from ..core.task_specification import TaskSpecification, CheckpointSpecification, MemoryChallenge, MemoryChallengeType
 from ..core.action_trace import ActionTracer, TaskTrace, ActionType
 from ..core.plugin_interfaces import AgentImplementation, MemorySystem
 from ..evaluation.results import EvaluationResult, CheckpointResult
 from ..evaluation.test_runner import TestRunner, TestRunResult
 from ..evaluation.monitoring import FileSystemWatcher
+from ..evaluation.memory_metrics import WorkingMemoryEvaluationEngine
+from ..evaluation.memory_challenges import MemoryChallengeHandler
 
 
 class TaskSpecificationLoader:
@@ -91,6 +93,36 @@ class TaskSpecificationLoader:
             )
             checkpoints.append(checkpoint)
 
+        # Create mock repository with basic attributes
+        repository_data = task_data.get('repository', {}) if isinstance(task_data.get('repository'), dict) else {}
+        
+        mock_repository = Mock()
+        # Set up get method to return repository data
+        def mock_get(key, default=None):
+            return repository_data.get(key, default)
+        mock_repository.get = mock_get
+        
+        # Set direct attributes for easier access
+        mock_repository.template_name = repository_data.get('template_name')
+        mock_repository.provided_files = repository_data.get('provided_files', [])
+        mock_repository.distractor_files = repository_data.get('distractor_files', [])
+        
+        # Parse memory challenges
+        memory_challenges = []
+        for challenge_data in task_data.get('memory_challenges', []):
+            challenge = MemoryChallenge(
+                challenge_id=challenge_data.get('challenge_id', 'unknown_challenge'),
+                challenge_type=MemoryChallengeType(challenge_data.get('challenge_type')),
+                at_checkpoint=challenge_data.get('at_checkpoint', ''),
+                description=challenge_data.get('description', ''),
+                metadata=challenge_data.get('metadata', {}),
+                affects=challenge_data.get('affects', []),
+                interruption_task=challenge_data.get('interruption_task'),
+                duration_minutes=challenge_data.get('duration_minutes'),
+                distractor_files=challenge_data.get('distractor_files', [])
+            )
+            memory_challenges.append(challenge)
+        
         task_spec = TaskSpecification(
             task_id=task_data.get('task_id', 'unknown_task'),
             title=task_data.get('title', 'Unknown Task'),
@@ -98,8 +130,8 @@ class TaskSpecificationLoader:
             description=task_data.get('description', ''),
             checkpoints=checkpoints,
             planning_phase=Mock(),
-            repository=Mock(),
-            memory_challenges=task_data.get('memory_challenges', [])
+            repository=mock_repository,
+            memory_challenges=memory_challenges
         )
         return task_spec
     
@@ -123,11 +155,22 @@ class BasicWorkMemEvalRunner:
     """
     Basic evaluation runner that orchestrates task execution and result collection.
     
-    This is the minimal viable evaluation harness that coordinates:
+    Coordinates:
     - Task loading and validation
     - Agent and memory system initialization
     - Checkpoint progression
     - Action tracing and result collection
+    
+    Working memory evaluation hooks:
+    - Baseline plan artifact: At the start of each checkpoint, the runner logs a PLANNING action with a minimal
+      plan (read_file -> implement -> edit_file for the checkpoint stub). This ensures plan_compliance has a
+      standardized plan source even when agents do not explicitly log planning.
+    - Pre-context-switch snapshot: Before executing a CONTEXT_SWITCH challenge, the runner logs a ContextSnapshot
+      using files accessed so far in the checkpoint. This improves RSR recall/fidelity metrics by providing a
+      pre-switch files_in_context reference.
+    - Legacy surfacing: After three-pillar evaluation, the runner surfaces update_robustness_overall,
+      resumption_success_overall, and their binary_success_rate counterparts in the flat working_memory_metrics for
+      backward compatibility.
     """
     
     def __init__(self, containerized: bool = False, docker_image: Optional[str] = None):
@@ -143,6 +186,9 @@ class BasicWorkMemEvalRunner:
         else:
             self.test_runner = TestRunner()
         self.fs_watcher = FileSystemWatcher()
+        
+        # Initialize three-pillar evaluation engine
+        self.working_memory_engine = WorkingMemoryEvaluationEngine()
     
     async def run_evaluation(
         self,
@@ -208,6 +254,50 @@ class BasicWorkMemEvalRunner:
             # Get behavioral trace
             task_trace = agent.get_behavioral_trace()
             
+            # Calculate working memory evaluation via the three-pillar engine (canonical)
+            legacy_metrics: Dict[str, float] = {}
+            three_pillar_eval = None
+            
+            # Only compute three-pillar metrics if task was successful (gating)
+            if success:
+                try:
+                    three_pillar_eval = self.working_memory_engine.evaluate_working_memory(
+                        task_trace, 
+                        task_spec, 
+                        agent_name=agent.__class__.__name__
+                    )
+                    # Best-effort: surface key challenge-driven metrics in flat legacy metrics for compatibility
+                    try:
+                        bi_metrics = getattr(three_pillar_eval, 'behavioral_integrity', None)
+                        if bi_metrics and hasattr(bi_metrics, 'metrics'):
+                            for m in bi_metrics.metrics:
+                                if getattr(m, 'name', '') == 'update_robustness':
+                                    try:
+                                        coverage = int(m.details.get('coverage', 0))
+                                    except Exception:
+                                        coverage = 0
+                                    if coverage > 0:
+                                        legacy_metrics['update_robustness_overall'] = m.value
+                                        try:
+                                            legacy_metrics['update_robustness_binary_success_rate'] = float(m.details.get('binary_success_rate', 0.0))
+                                        except Exception:
+                                            pass
+                                if getattr(m, 'name', '') == 'resumption_success_rate':
+                                    try:
+                                        coverage = int(m.details.get('coverage', 0))
+                                    except Exception:
+                                        coverage = 0
+                                    if coverage > 0:
+                                        legacy_metrics['resumption_success_overall'] = m.value
+                                        try:
+                                            legacy_metrics['resumption_success_binary_success_rate'] = float(m.details.get('binary_success_rate', 0.0))
+                                        except Exception:
+                                            pass
+                    except Exception:
+                        pass
+                except Exception as e:
+                    print(f"Warning: Three-pillar evaluation failed: {e}")
+            
             # Create evaluation result
             evaluation_result = EvaluationResult(
                 task_id=task_spec.task_id,
@@ -217,7 +307,8 @@ class BasicWorkMemEvalRunner:
                 execution_time_seconds=time.time() - evaluation_start,
                 task_trace=task_trace,
                 checkpoint_results=checkpoint_results,
-                working_memory_metrics=self._calculate_basic_metrics(task_trace)
+                working_memory_metrics=legacy_metrics,
+                three_pillar_evaluation=three_pillar_eval
             )
             
             # Persist results to evaluation_runs/{task_id}/{timestamp}.json
@@ -275,6 +366,15 @@ class BasicWorkMemEvalRunner:
         # Store initial task context (delegate to agent)
         agent._store_task_context(task_spec)
         
+        # Initialize memory challenge handler
+        challenge_handler = MemoryChallengeHandler(action_tracer)
+        
+        # Check if memory challenges are enabled
+        challenges_enabled = getattr(task_spec.evaluation_config, 'enable_memory_challenges', True) if hasattr(task_spec, 'evaluation_config') else True
+        
+        if task_spec.memory_challenges and challenges_enabled:
+            print(f"📋 Memory challenges enabled: {len(task_spec.memory_challenges)} challenge(s) configured")
+        
         # Track per-checkpoint results
         checkpoint_results: List[CheckpointResult] = []
         
@@ -289,6 +389,23 @@ class BasicWorkMemEvalRunner:
                 success=True,
                 title=checkpoint.title
             )
+
+            # Log a baseline plan artifact to ensure plan compliance metrics have a standardized source
+            try:
+                plan_steps = [
+                    {"action": "read_file", "file_path": checkpoint.stub_file},
+                    {"action": "implement"},
+                    {"action": "edit_file", "file_path": checkpoint.stub_file},
+                ]
+                action_tracer.log_action(
+                    ActionType.PLANNING,
+                    success=True,
+                    plan=plan_steps,
+                    source="baseline_auto"
+                )
+            except Exception:
+                # Non-fatal if logging plan fails
+                pass
 
             # File system snapshot before execution
             snapshot_before = self.fs_watcher.snapshot(working_directory)
@@ -371,6 +488,27 @@ class BasicWorkMemEvalRunner:
                 else:
                     print(f"❌ Checkpoint {checkpoint.checkpoint_id} tests failed (exit {test_result.exit_code})")
                 
+                # Execute memory challenges for this checkpoint
+                if task_spec.memory_challenges and challenges_enabled:
+                    checkpoint_challenges = [c for c in task_spec.memory_challenges if c.at_checkpoint == checkpoint.checkpoint_id]
+                    for challenge in checkpoint_challenges:
+                        try:
+                            # For context switch challenges, capture a pre-switch snapshot of files in context
+                            if challenge.challenge_type == MemoryChallengeType.CONTEXT_SWITCH:
+                                try:
+                                    cp_trace_for_snapshot = agent.get_behavioral_trace().get_checkpoint_trace(checkpoint.checkpoint_id)
+                                    files_in_context = list(cp_trace_for_snapshot.get_file_access_pattern().keys()) if cp_trace_for_snapshot else []
+                                    action_tracer.log_context_snapshot(
+                                        files_in_context=files_in_context,
+                                        working_directory=str(working_directory),
+                                        reason="pre_context_switch"
+                                    )
+                                except Exception:
+                                    pass
+                            await challenge_handler.execute_challenge(challenge, agent, checkpoint, working_directory)
+                        except Exception as challenge_error:
+                            print(f"⚠️  Memory challenge {challenge.challenge_id} failed: {challenge_error}")
+                
             except Exception as e:
                 print(f"❌ Checkpoint {checkpoint.checkpoint_id} failed with error: {e}")
                 action_tracer.log_action(
@@ -390,10 +528,29 @@ class BasicWorkMemEvalRunner:
                         errors_encountered=[str(e)],
                     )
                 )
-                # Continue to next checkpoint for observability rather than early exit
+                # Propagate the error to satisfy strict error-propagation expectations
+                raise
                 
         # Task success is defined as all checkpoint tests passing
         success = all(cp.tests_passed for cp in checkpoint_results) if checkpoint_results else False
+        
+        # Clean up memory challenge artifacts and report summary
+        if task_spec.memory_challenges and challenges_enabled:
+            try:
+                challenge_summary = challenge_handler.get_challenge_summary()
+                if challenge_summary['total_challenges'] > 0:
+                    print(f"\n📋 Memory Challenge Summary:")
+                    print(f"  Total challenges executed: {challenge_summary['total_challenges']}")
+                    print(f"  Successful: {challenge_summary['successful_challenges']}")
+                    print(f"  Failed: {challenge_summary['failed_challenges']}")
+                    print(f"  Total duration: {challenge_summary['total_duration']:.2f}s")
+                    if challenge_summary['distractor_files_created'] > 0:
+                        print(f"  Distractor files created: {challenge_summary['distractor_files_created']}")
+                
+                # Clean up distractor files
+                challenge_handler.cleanup_distractor_files()
+            except Exception as cleanup_error:
+                print(f"Warning: Challenge cleanup failed: {cleanup_error}")
         
         if success:
             print("✅ All checkpoints completed successfully (tests passed)")
@@ -402,16 +559,6 @@ class BasicWorkMemEvalRunner:
         
         return success, checkpoint_results
     
-    def _create_checkpoint_results(
-        self,
-        task_spec: TaskSpecification,
-        task_trace: TaskTrace
-    ) -> List[CheckpointResult]:
-        """
-        Deprecated: Checkpoint results are now built during execution.
-        This method remains for compatibility and returns an empty list.
-        """
-        return []
 
     def _materialize_repository(self, template_name: str, working_directory: Path) -> None:
         """Copy template directory into working directory.
@@ -433,14 +580,7 @@ class BasicWorkMemEvalRunner:
     
     def _calculate_basic_metrics(self, task_trace: TaskTrace) -> Dict[str, float]:
         """
-        Calculate working memory metrics using the metrics module.
+        Deprecated: legacy metrics computation removed in favor of three-pillar evaluation.
+        Retained to return an empty dict for backward compatibility.
         """
-        try:
-            from ..evaluation import metrics
-            task_spec = self.current_evaluation.get('task_spec') if self.current_evaluation else None
-            if task_spec is None:
-                return {}
-            return metrics.compute_all_metrics(task_spec, task_trace)
-        except Exception:
-            # Fallback to empty metrics on failure
-            return {}
+        return {}

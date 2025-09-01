@@ -159,6 +159,14 @@ class SimpleWorkMemAgent(AgentImplementation):
         
         # Enable secure file operations if requested
         self.use_secure_file_ops = config.get('use_secure_file_ops', True)
+        
+        # If memory_system is already a MemorySystemInterface, use it directly
+        # Otherwise wrap it (for backward compatibility)
+        from ..memory.memory_system import MemorySystemInterface
+        if isinstance(memory_system, MemorySystemInterface):
+            self.memory_interface = memory_system
+        else:
+            self.memory_interface = MemorySystemInterface(memory_system)
     
     def initialize_secure_file_ops(self, working_directory: Path) -> None:
         """Initialize secure file operations for the given working directory"""
@@ -181,30 +189,6 @@ class SimpleWorkMemAgent(AgentImplementation):
             supports_introspection=True
         )
     
-    def execute_task(self, task_spec: TaskSpecification, action_tracer: ActionTracer) -> bool:
-        """
-        Execute a complete task using memory-guided reasoning.
-        
-        DEPRECATED: This method is kept for compatibility but orchestration
-        should now be handled by the runner calling execute_checkpoint directly.
-        
-        Args:
-            task_spec: The task to execute
-            action_tracer: Tracer for logging actions
-            
-        Returns:
-            True if task completed successfully, False otherwise
-        """
-        self.action_tracer = action_tracer
-        
-        # Store initial task information in memory
-        self._store_task_context(task_spec)
-        
-        # Note: Checkpoint orchestration should now be handled by the runner
-        # This method is kept for compatibility but will log a warning
-        print("Warning: execute_task is deprecated. Use runner orchestration instead.")
-        
-        return True
     
     async def execute_checkpoint(self, checkpoint: CheckpointSpecification) -> bool:
         """
@@ -217,6 +201,14 @@ class SimpleWorkMemAgent(AgentImplementation):
             True if checkpoint completed successfully
         """
         try:
+            # If no active checkpoint trace exists or it's a different one, start it here
+            started_here = False
+            if self.action_tracer:
+                current = self.action_tracer.current_checkpoint_trace
+                if current is None or current.checkpoint_id != checkpoint.checkpoint_id:
+                    self.action_tracer.start_checkpoint(checkpoint.checkpoint_id)
+                    started_here = True
+            
             # Store checkpoint context in memory
             self._store_checkpoint_context(checkpoint)
             
@@ -229,10 +221,23 @@ class SimpleWorkMemAgent(AgentImplementation):
             # Execute the plan
             success = self._execute_plan(checkpoint, plan)
             
+            # If we started the checkpoint here, complete it here as well
+            if started_here and self.action_tracer:
+                self.action_tracer.complete_checkpoint(success)
+            
             return success
             
         except Exception as e:
-            self._log_action(ActionType.ERROR_ENCOUNTERED, f"Checkpoint {checkpoint.checkpoint_id} failed: {e}")
+            self._log_action(
+                ActionType.ERROR_ENCOUNTERED, 
+                success=False,
+                error_message=f"Checkpoint {checkpoint.checkpoint_id} failed: {e}"
+            )
+            # If we had to start the checkpoint here, ensure it's marked complete as failed
+            if self.action_tracer and self.action_tracer.current_checkpoint_trace and \
+               self.action_tracer.current_checkpoint_trace.checkpoint_id == checkpoint.checkpoint_id and \
+               self.action_tracer.current_checkpoint_trace.end_timestamp is None:
+                self.action_tracer.complete_checkpoint(False)
             return False
     
     def _store_task_context(self, task_spec: TaskSpecification):
@@ -244,7 +249,7 @@ class SimpleWorkMemAgent(AgentImplementation):
             'checkpoint_files': [(cp.stub_file, cp.test_file) for cp in task_spec.checkpoints]
         }
         
-        self.memory_system.store_information(
+        self.memory_interface.store(
             f"task_{task_spec.task_id}",
             json.dumps(task_context),
             {'type': 'task', 'timestamp': time.time()}
@@ -262,7 +267,7 @@ class SimpleWorkMemAgent(AgentImplementation):
             'order': checkpoint.order
         }
         
-        self.memory_system.store_information(
+        self.memory_interface.store(
             f"checkpoint_{checkpoint.checkpoint_id}",
             json.dumps(checkpoint_context),
             {'type': 'checkpoint', 'timestamp': time.time()}
@@ -282,7 +287,7 @@ class SimpleWorkMemAgent(AgentImplementation):
         
         for query in queries:
             if query.strip():
-                results = self.memory_system.retrieve_information(query, {
+                results = self.memory_interface.retrieve(query, {
                     'max_results': self.memory_context_limit
                 })
                 context['retrieved_items'].extend(results)
@@ -376,24 +381,38 @@ What steps should I take to complete this checkpoint?
             elif action == 'implement':
                 return self._implement_functionality(step['description'])
             else:
-                self._log_action(ActionType.ERROR_ENCOUNTERED, f"Unknown action: {action}")
+                self._log_action(
+                    ActionType.ERROR_ENCOUNTERED, 
+                    success=False,
+                    error_message=f"Unknown action: {action}"
+                )
                 return False
         
         except Exception as e:
-            self._log_action(ActionType.ERROR_ENCOUNTERED, f"Step execution failed: {e}")
+            self._log_action(
+                ActionType.ERROR_ENCOUNTERED, 
+                success=False,
+                error_message=f"Step execution failed: {e}"
+            )
             return False
     
     def _read_file(self, file_path: str) -> bool:
         """Read a file and store its contents in memory"""
         try:
+            size_bytes = 0
             if self.secure_file_ops:
-                # Use secure file operations to read from disk
+                # Use secure file operations to read from disk with size info
                 try:
-                    content = self.secure_file_ops.read_file(file_path)
+                    content, size_bytes = self.secure_file_ops.read_file_with_size(file_path)
                     # Update cache with real content
                     self.file_read_cache[file_path] = content
                 except (FileNotFoundError, SecurityViolationError) as e:
-                    self._log_action(ActionType.ERROR_ENCOUNTERED, f"Secure file read failed for {file_path}: {e}")
+                    self._log_action(
+                        ActionType.ERROR_ENCOUNTERED, 
+                        success=False, 
+                        file_path=file_path,
+                        error_message=f"Secure file read failed for {file_path}: {e}"
+                    )
                     return False
             else:
                 # Check cache first (mock mode)
@@ -403,24 +422,37 @@ What steps should I take to complete this checkpoint?
                     # For mock implementation, simulate file content
                     content = self._get_mock_file_content(file_path)
                     self.file_read_cache[file_path] = content
+                # Calculate size for mock content
+                size_bytes = len(content.encode('utf-8')) if isinstance(content, str) else len(content)
             
             # Store file content in memory
-            self.memory_system.store_information(
+            self.memory_interface.store(
                 f"file_content_{file_path}",
                 content,
                 {'type': 'file_content', 'file_path': file_path, 'timestamp': time.time()}
             )
             
-            self._log_action(ActionType.FILE_READ, file_path)
+            self._log_action(
+                ActionType.FILE_READ, 
+                success=True, 
+                file_path=file_path,
+                size_bytes=size_bytes
+            )
             return True
             
         except Exception as e:
-            self._log_action(ActionType.ERROR_ENCOUNTERED, f"Failed to read file {file_path}: {e}")
+            self._log_action(
+                ActionType.ERROR_ENCOUNTERED, 
+                success=False, 
+                file_path=file_path,
+                error_message=f"Failed to read file {file_path}: {e}"
+            )
             return False
     
     def _create_file(self, file_path: str, initial_content: str = '') -> bool:
         """Create a new file with given content"""
         try:
+            size_bytes = 0
             if self.secure_file_ops:
                 # Use secure file operations to write to disk
                 try:
@@ -431,33 +463,58 @@ What steps should I take to complete this checkpoint?
                         else:
                             initial_content = self._get_mock_file_content(file_path)
                     
-                    self.secure_file_ops.write_file(file_path, initial_content, append=False)
+                    size_bytes = self.secure_file_ops.write_file_with_size(file_path, initial_content, append=False)
                     # Update cache with real content
                     self.file_read_cache[file_path] = initial_content
                 except SecurityViolationError as e:
-                    self._log_action(ActionType.ERROR_ENCOUNTERED, f"Secure file write failed for {file_path}: {e}")
+                    self._log_action(
+                        ActionType.ERROR_ENCOUNTERED, 
+                        success=False, 
+                        file_path=file_path,
+                        error_message=f"Secure file write failed for {file_path}: {e}"
+                    )
                     return False
             else:
-                # For mock implementation, store in cache
+                # For mock implementation, generate content if needed
+                if not initial_content.strip():
+                    if 'calculator' in file_path.lower():
+                        initial_content = self.llm._generate_function_implementation(f"implement calculator functions for {file_path}")
+                    else:
+                        initial_content = self._get_mock_file_content(file_path)
+                
+                # Store in cache
                 self.file_read_cache[file_path] = initial_content
+                size_bytes = len(initial_content.encode('utf-8')) if isinstance(initial_content, str) else len(initial_content)
             
             # Store creation event in memory
-            self.memory_system.store_information(
+            self.memory_interface.store(
                 f"file_created_{file_path}",
                 f"Created file with {len(initial_content)} characters",
                 {'type': 'file_creation', 'file_path': file_path, 'timestamp': time.time()}
             )
             
-            self._log_action(ActionType.FILE_WRITE, file_path)
+            self._log_action(
+                ActionType.FILE_WRITE, 
+                success=True, 
+                file_path=file_path,
+                size_bytes=size_bytes,
+                operation='create'
+            )
             return True
             
         except Exception as e:
-            self._log_action(ActionType.ERROR_ENCOUNTERED, f"Failed to create file {file_path}: {e}")
+            self._log_action(
+                ActionType.ERROR_ENCOUNTERED, 
+                success=False, 
+                file_path=file_path,
+                error_message=f"Failed to create file {file_path}: {e}"
+            )
             return False
     
     def _edit_file(self, file_path: str, changes: str) -> bool:
         """Edit an existing file"""
         try:
+            size_bytes = 0
             if self.secure_file_ops:
                 # Use secure file operations to read current content and write changes
                 try:
@@ -471,13 +528,18 @@ What steps should I take to complete this checkpoint?
                     # Apply changes (for now, simple append)
                     new_content = current_content + '\n' + changes
                     
-                    # Write back to disk
-                    self.secure_file_ops.write_file(file_path, new_content, append=False)
+                    # Write back to disk with size tracking
+                    size_bytes = self.secure_file_ops.write_file_with_size(file_path, new_content, append=False)
                     
                     # Update cache
                     self.file_read_cache[file_path] = new_content
                 except SecurityViolationError as e:
-                    self._log_action(ActionType.ERROR_ENCOUNTERED, f"Secure file edit failed for {file_path}: {e}")
+                    self._log_action(
+                        ActionType.ERROR_ENCOUNTERED, 
+                        success=False, 
+                        file_path=file_path,
+                        error_message=f"Secure file edit failed for {file_path}: {e}"
+                    )
                     return False
             else:
                 # Get current content from cache (mock mode)
@@ -486,19 +548,31 @@ What steps should I take to complete this checkpoint?
                 # For mock implementation, append changes
                 new_content = current_content + '\n' + changes
                 self.file_read_cache[file_path] = new_content
+                size_bytes = len(new_content.encode('utf-8')) if isinstance(new_content, str) else len(new_content)
             
             # Store edit event in memory
-            self.memory_system.store_information(
+            self.memory_interface.store(
                 f"file_edited_{file_path}",
                 f"Applied changes: {changes[:100]}...",
                 {'type': 'file_edit', 'file_path': file_path, 'timestamp': time.time()}
             )
             
-            self._log_action(ActionType.FILE_WRITE, file_path)
+            self._log_action(
+                ActionType.FILE_WRITE, 
+                success=True, 
+                file_path=file_path,
+                size_bytes=size_bytes,
+                operation='edit'
+            )
             return True
             
         except Exception as e:
-            self._log_action(ActionType.ERROR_ENCOUNTERED, f"Failed to edit file {file_path}: {e}")
+            self._log_action(
+                ActionType.ERROR_ENCOUNTERED, 
+                success=False, 
+                file_path=file_path,
+                error_message=f"Failed to edit file {file_path}: {e}"
+            )
             return False
     
     def _implement_functionality(self, description: str) -> bool:
@@ -509,17 +583,26 @@ What steps should I take to complete this checkpoint?
             response = self.llm.generate_response(prompt)
             
             # Store implementation in memory
-            self.memory_system.store_information(
+            self.memory_interface.store(
                 f"implementation_{hash(description)}",
                 response,
                 {'type': 'implementation', 'description': description, 'timestamp': time.time()}
             )
             
-            self._log_action(ActionType.LLM_CALL, description)
+            self._log_action(
+                ActionType.LLM_CALL, 
+                success=True,
+                description=description,
+                response_length=len(response) if response else 0
+            )
             return True
             
         except Exception as e:
-            self._log_action(ActionType.ERROR_ENCOUNTERED, f"Failed to implement functionality: {e}")
+            self._log_action(
+                ActionType.ERROR_ENCOUNTERED, 
+                success=False,
+                error_message=f"Failed to implement functionality: {e}"
+            )
             return False
     
     def _file_exists(self, file_path: str) -> bool:
@@ -561,20 +644,35 @@ What steps should I take to complete this checkpoint?
         For this simple agent, we delegate to the ActionTracer
         which maintains the actual trace data.
         
+        If no agent-level tracer is set, but the wrapped memory interface
+        has an ActionTracer (common in integration setups), we return that
+        tracer's task trace to provide a consistent, non-"unknown" task_id.
+        
         Returns:
             TaskTrace containing all agent behavior for working memory analysis
         """
         if self.action_tracer:
             return self.action_tracer.get_task_trace()
-        else:
-            # Return empty trace if no tracer available
-            return TaskTrace(
-                task_id="unknown",
-                start_timestamp=time.time(),
-                completed_successfully=False
-            )
+        # Fall back to memory interface tracer if available
+        mem_tracer = getattr(self.memory_interface, 'action_tracer', None)
+        if mem_tracer is not None:
+            try:
+                return mem_tracer.get_task_trace()
+            except Exception:
+                pass
+        # Return minimal trace as last resort
+        return TaskTrace(
+            task_id="unknown",
+            start_timestamp=time.time(),
+            completed_successfully=False
+        )
     
-    def _log_action(self, action_type: ActionType, details: str):
+    def _log_action(self, action_type: ActionType, success: bool = True, file_path: Optional[str] = None, **metadata):
         """Log an action if tracer is available"""
         if self.action_tracer:
-            self.action_tracer.log_action(action_type, details)
+            self.action_tracer.log_action(
+                action_type=action_type,
+                success=success,
+                file_path=file_path,
+                **metadata
+            )

@@ -150,6 +150,43 @@ class SecureFileOperations:
         with open(validated_path, 'r', encoding='utf-8') as f:
             return f.read()
     
+    def read_file_with_size(self, file_path: str) -> tuple[str, int]:
+        """
+        Safely read a file and return both content and size.
+        
+        Args:
+            file_path: Path to file to read
+            
+        Returns:
+            Tuple of (file contents, size in bytes)
+            
+        Raises:
+            SecurityViolationError: If path is invalid
+            FileNotFoundError: If file doesn't exist
+            OSError: If file can't be read
+        """
+        validated_path = self._validate_path(file_path)
+        
+        if not validated_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+        
+        if not validated_path.is_file():
+            raise SecurityViolationError(f"Path is not a file: {file_path}")
+        
+        # Check file size
+        size = validated_path.stat().st_size
+        if size > self.max_file_size:
+            raise SecurityViolationError(
+                f"File {file_path} too large: {size} bytes (max {self.max_file_size})"
+            )
+        
+        logger.info(f"Reading file: {validated_path} ({size} bytes)")
+        
+        with open(validated_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            # Return actual content size (may differ from file size due to encoding)
+            return content, len(content.encode('utf-8'))
+    
     def write_file(self, file_path: str, content: str, append: bool = False) -> None:
         """
         Safely write to a file within the allowed directory.
@@ -176,10 +213,46 @@ class SecureFileOperations:
         validated_path.parent.mkdir(parents=True, exist_ok=True)
         
         mode = 'a' if append else 'w'
-        logger.info(f"Writing file: {validated_path} (mode: {mode})")
+        logger.info(f"Writing file: {validated_path} (mode: {mode}, {content_size} bytes)")
         
         with open(validated_path, mode, encoding='utf-8') as f:
             f.write(content)
+    
+    def write_file_with_size(self, file_path: str, content: str, append: bool = False) -> int:
+        """
+        Safely write to a file and return the size written.
+        
+        Args:
+            file_path: Path to file to write
+            content: Content to write
+            append: Whether to append (True) or overwrite (False)
+            
+        Returns:
+            Size of content written in bytes
+            
+        Raises:
+            SecurityViolationError: If path is invalid or content too large
+            OSError: If file can't be written
+        """
+        validated_path = self._validate_path(file_path)
+        
+        # Check content size
+        content_size = len(content.encode('utf-8'))
+        if content_size > self.max_file_size:
+            raise SecurityViolationError(
+                f"Content too large: {content_size} bytes (max {self.max_file_size})"
+            )
+        
+        # Ensure parent directory exists
+        validated_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        mode = 'a' if append else 'w'
+        logger.info(f"Writing file: {validated_path} (mode: {mode}, {content_size} bytes)")
+        
+        with open(validated_path, mode, encoding='utf-8') as f:
+            f.write(content)
+        
+        return content_size
     
     def file_exists(self, file_path: str) -> bool:
         """
