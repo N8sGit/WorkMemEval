@@ -63,6 +63,42 @@ docker compose -f docker/compose.dev.yml run --rm eval "pytest -q /workspace/tes
 - Containerized tests add OS-level isolation and resource controls.
 - .gitignore blocks common local artifacts and .env; pre-commit hooks provide linting and basic security checks.
 
+## Working memory metrics overview
+
+The evaluation engine implements a three-pillar framework (Memory Fidelity, Contextual Relevance, Behavioral Integrity).
+Two challenge-driven metrics were added under Behavioral Integrity:
+
+- Update Robustness (UR)
+  - Triggered by requirement_update and integration_constraint challenge events
+  - Components (default weights):
+    - compliance (0.40): 1.0 if a passing test is observed after the update; 0.5 if only writes/modifies occur (fallback
+      when tests are absent); otherwise 0.0
+    - latency (0.20): exp(-steps_to_first_signal / τ), τ by severity (small=10, medium=25, large=50)
+    - stability (0.20): 1/(1 + conflicts/3) based on subsequent modifications to affected files in a short window
+    - consistency (0.20): fraction of subsequent touches that target the affected files
+  - Binary success: per-update binary_success=1 only if a passing test is observed; an overall binary_success_rate is
+    included in metric details
+
+- Resumption Success Rate (RSR)
+  - Triggered by context_switch_resume events (paired with the most recent context_switch_start)
+  - Components (default weights):
+    - latency (0.35): exp(-steps_to_productive / τ), τ by severity (small=12, medium=18, large=25)
+    - recall (0.25) and fidelity (0.25): Jaccard overlap between first post-resume touched files and pre-switch
+      files_in_context from a ContextSnapshot
+    - overhead (0.15): 1 - min(1, exploratory_action_ratio) in the first N actions post-resume
+  - Binary success: per-resume binary_success=1 if the resume event has success=True; metric details include an
+    overall binary_success_rate
+
+Runner behavior to support these metrics:
+- The runner logs a minimal baseline plan (PLANNING action) at the start of each checkpoint so plan_compliance has a
+  consistent source when agents do not log plans.
+- Before a context switch challenge, the runner logs a pre-switch ContextSnapshot based on files accessed so far in
+  the checkpoint; this improves recall/fidelity confidence in RSR.
+- Optional (deprecated): you can surface a subset of three-pillar metrics into the flat working_memory_metrics by
+  constructing the runner with surface_legacy_metrics=True. When enabled, the following fields may be included:
+  - update_robustness_overall, update_robustness_binary_success_rate
+  - resumption_success_overall, resumption_success_binary_success_rate
+
 ## CI overview
 - CI builds the evaluation image and runs the test suite inside the container (network disabled) for deterministic results.
 - Pre-commit hooks run in CI.

@@ -539,6 +539,8 @@ class WorkMemEvalAdapter:
         return self.aggregate_results(results)
 ```
 
+Note: In this repository, agent-level execute_task is deprecated. Use src.evaluation.runner.BasicWorkMemEvalRunner.run_evaluation(...) for orchestration.
+
 ## 10. Key Design Principles
 
 1. **Simplicity Over Complexity**: Single-agent architecture with minimal tool set
