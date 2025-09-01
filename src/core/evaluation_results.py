@@ -30,20 +30,53 @@ class MemoryFidelityMetrics:
     Measures the agent's ability to maintain accurate, complete information
     over time without degradation or unnecessary redundancy.
     """
-    # Information retention
-    context_reread_rate: float          # Proportion of unnecessary file re-accesses
-    information_persistence_score: float # Quality of info retention across steps
+    # Core memory fidelity measurements
+    context_reread_rate: float              # Proportion of unnecessary file re-accesses
+    size_weighted_reread_penalty: float     # Size-weighted penalty for rereads
+    information_retention_score: float      # Cross-checkpoint information retention
+    compression_efficiency: float           # Memory compression effectiveness
+    overall_fidelity_score: float          # Combined fidelity assessment
     
-    # Information compression quality
-    tcil_score: float                   # Task Completion Integrity Loss
-    compression_efficiency: float       # Compression without info loss
+    # Temporal analysis
+    degradation_analysis: Dict[str, Any] = field(default_factory=dict)
     
-    # Aggregate score
-    overall_fidelity_score: float      # Combined fidelity assessment
+    # Diagnostic information
+    diagnostics: Dict[str, Any] = field(default_factory=dict)
     
-    # Supporting data
+    # Supporting data (preserved for compatibility)
     file_access_statistics: Dict[str, Any] = field(default_factory=dict)
     compression_events: List[Dict[str, Any]] = field(default_factory=list)
+    
+    # Deprecated fields (kept for compatibility)
+    information_persistence_score: float = 0.0  # Replaced by information_retention_score
+    tcil_score: float = 0.0                    # Replaced by compression_efficiency
+    
+    def __post_init__(self):
+        """Calculate overall fidelity score from component metrics"""
+        if self.overall_fidelity_score == 0.0:
+            # Calculate weighted average of core metrics
+            # Lower reread rate and penalty = higher score
+            reread_score = 1.0 - self.context_reread_rate
+            penalty_score = 1.0 - self.size_weighted_reread_penalty
+            retention_score = self.information_retention_score
+            compression_score = self.compression_efficiency
+            
+            # Weighted combination (can be tuned based on importance)
+            weights = {'reread': 0.3, 'penalty': 0.2, 'retention': 0.3, 'compression': 0.2}
+            
+            self.overall_fidelity_score = (
+                weights['reread'] * reread_score +
+                weights['penalty'] * penalty_score +
+                weights['retention'] * retention_score +
+                weights['compression'] * compression_score
+            )
+            
+            # Ensure score is in valid range
+            self.overall_fidelity_score = max(0.0, min(1.0, self.overall_fidelity_score))
+        
+        # Set deprecated fields for compatibility
+        self.information_persistence_score = self.information_retention_score
+        self.tcil_score = self.compression_efficiency
     
     def get_pillar_score(self) -> float:
         """Get the overall pillar score (0.0 to 1.0)"""
@@ -422,8 +455,8 @@ class TaskEvaluationResult:
         
         avg_fidelity = MemoryFidelityMetrics(
             context_reread_rate=statistics.mean(m.context_reread_rate for m in fidelity_metrics),
-            information_persistence_score=statistics.mean(m.information_persistence_score for m in fidelity_metrics),
-            tcil_score=statistics.mean(m.tcil_score for m in fidelity_metrics),
+            size_weighted_reread_penalty=statistics.mean(m.size_weighted_reread_penalty for m in fidelity_metrics),
+            information_retention_score=statistics.mean(m.information_retention_score for m in fidelity_metrics),
             compression_efficiency=statistics.mean(m.compression_efficiency for m in fidelity_metrics),
             overall_fidelity_score=statistics.mean(m.overall_fidelity_score for m in fidelity_metrics)
         )

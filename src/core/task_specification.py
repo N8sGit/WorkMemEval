@@ -107,6 +107,10 @@ class RepositoryTemplate:
     distractor_files: List[str] = field(default_factory=list)  # For relevance testing
     directory_structure: Dict[str, List[str]] = field(default_factory=dict)
     setup_commands: List[str] = field(default_factory=list)
+    
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get attribute by key name (for backward compatibility with dict access)"""
+        return getattr(self, key, default)
 
 
 @dataclass

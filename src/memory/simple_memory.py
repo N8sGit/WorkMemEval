@@ -53,7 +53,7 @@ class NoMemory(MemorySystem):
         """Return snapshot showing no memory"""
         return {
             'total_items': 0,
-            'memory_size_estimate': 0,
+            'memory_size_bytes': 0,
             'last_accessed': self.last_accessed,
             'access_count': self.access_count,
             'memory_type': 'no_memory'
@@ -180,7 +180,7 @@ class SimpleContextMemory(MemorySystem):
         
         return {
             'total_items': len(self.items),
-            'memory_size_estimate': total_size,
+            'memory_size_bytes': total_size,
             'last_accessed': self.last_accessed,
             'memory_type': 'simple_context',
             'config': {
@@ -392,9 +392,11 @@ class CompressedMemory(MemorySystem):
     
     def get_memory_snapshot(self) -> Dict[str, Any]:
         """Get memory snapshot including compression stats"""
+        total_size = self._calculate_total_size()
         return {
             'total_items': len(self.items) + len(self.compressed_items),
-            'memory_size_estimate': self._calculate_total_size(),
+            'memory_size_bytes': total_size,
+            'memory_size_estimate': total_size,  # legacy compatibility
             'last_accessed': self.last_accessed,
             'memory_type': 'compressed',
             'compression_stats': {
@@ -468,3 +470,12 @@ class CompressedMemory(MemorySystem):
         regular_size = sum(len(str(item)) for item in self.items)
         compressed_size = sum(len(str(item)) for item in self.compressed_items)
         return regular_size + compressed_size
+    
+    def compress_memory(self) -> bool:
+        """Explicitly trigger compression if possible.
+        Returns True if any items were moved to compressed storage.
+        """
+        before_uncompressed = len(self.items)
+        before_compressed = len(self.compressed_items)
+        self._compress_oldest_items()
+        return (len(self.items) != before_uncompressed) or (len(self.compressed_items) != before_compressed)
