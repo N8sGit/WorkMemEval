@@ -87,6 +87,9 @@ class EvaluationResult:
     # Working memory metrics (basic for now)
     working_memory_metrics: Dict[str, float] = field(default_factory=dict)
     
+    # Three-pillar working memory evaluation (structured)
+    three_pillar_evaluation: Optional[Any] = None  # WorkingMemoryEvaluation from memory_metrics
+    
     # Error information
     failure_reason: Optional[str] = None
     
@@ -94,7 +97,7 @@ class EvaluationResult:
     evaluation_config: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
             'task_id': self.task_id,
             'agent_name': self.agent_name,
             'memory_system_name': self.memory_system_name,
@@ -107,6 +110,21 @@ class EvaluationResult:
             'failure_reason': self.failure_reason,
             'evaluation_config': self.evaluation_config,
         }
+        
+        # Include three-pillar evaluation if available
+        if self.three_pillar_evaluation:
+            # Convert to dict if it has a to_dict method, otherwise store directly
+            if hasattr(self.three_pillar_evaluation, 'to_dict'):
+                result['three_pillar_evaluation'] = self.three_pillar_evaluation.to_dict()
+            else:
+                # Fallback: convert dataclass to dict manually
+                try:
+                    from dataclasses import asdict
+                    result['three_pillar_evaluation'] = asdict(self.three_pillar_evaluation)
+                except Exception:
+                    result['three_pillar_evaluation'] = str(self.three_pillar_evaluation)
+        
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'EvaluationResult':
@@ -123,6 +141,7 @@ class EvaluationResult:
             timestamp=data.get('timestamp', time.time()),
             checkpoint_results=checkpoint_results,
             working_memory_metrics=data.get('working_memory_metrics', {}),
+            three_pillar_evaluation=data.get('three_pillar_evaluation'),
             failure_reason=data.get('failure_reason'),
             evaluation_config=data.get('evaluation_config', {}),
         )
@@ -155,7 +174,20 @@ class EvaluationResult:
         total = len(self.checkpoint_results)
         print(f"Checkpoints: {completed}/{total} completed")
         
-        # Working memory metrics
+        # Three-pillar metrics (if available)
+        if self.three_pillar_evaluation and hasattr(self.three_pillar_evaluation, 'overall_working_memory_score'):
+            print(f"\nThree-Pillar Working Memory Analysis:")
+            print(f"  Overall Score: {self.three_pillar_evaluation.overall_working_memory_score:.3f} (Grade: {self.three_pillar_evaluation.grade})")
+            
+            # Show pillar scores
+            if hasattr(self.three_pillar_evaluation, 'memory_fidelity'):
+                print(f"  Memory Fidelity: {self.three_pillar_evaluation.memory_fidelity.overall_score:.3f}")
+            if hasattr(self.three_pillar_evaluation, 'contextual_relevance'):
+                print(f"  Contextual Relevance: {self.three_pillar_evaluation.contextual_relevance.overall_score:.3f}")
+            if hasattr(self.three_pillar_evaluation, 'behavioral_integrity'):
+                print(f"  Behavioral Integrity: {self.three_pillar_evaluation.behavioral_integrity.overall_score:.3f}")
+        
+        # Legacy working memory metrics
         if self.working_memory_metrics:
             print(f"\nWorking Memory Metrics:")
             for metric_name, value in self.working_memory_metrics.items():

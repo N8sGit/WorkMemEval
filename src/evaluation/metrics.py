@@ -9,6 +9,14 @@ Includes:
 
 from __future__ import annotations
 
+import warnings
+warnings.warn(
+    "src.evaluation.metrics is deprecated and will be removed in a future release. "
+    "Use src.evaluation.memory_metrics (three-pillar engine) instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
