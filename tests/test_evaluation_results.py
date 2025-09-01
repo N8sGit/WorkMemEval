@@ -29,15 +29,14 @@ class TestMemoryFidelityMetrics:
         """Test creating memory fidelity metrics"""
         metrics = MemoryFidelityMetrics(
             context_reread_rate=0.15,
-            information_persistence_score=0.85,
-            tcil_score=0.92,
+            size_weighted_reread_penalty=0.05,
+            information_retention_score=0.85,
             compression_efficiency=0.88,
             overall_fidelity_score=0.87
         )
         
         assert metrics.context_reread_rate == 0.15
-        assert metrics.information_persistence_score == 0.85
-        assert metrics.tcil_score == 0.92
+        assert metrics.information_retention_score == 0.85
         assert metrics.compression_efficiency == 0.88
         assert metrics.get_pillar_score() == 0.87
     
@@ -45,9 +44,9 @@ class TestMemoryFidelityMetrics:
         """Test diagnostics for good memory fidelity performance"""
         metrics = MemoryFidelityMetrics(
             context_reread_rate=0.05,  # Good
-            information_persistence_score=0.9,
-            tcil_score=0.95,  # Good
-            compression_efficiency=0.9,
+            size_weighted_reread_penalty=0.02,
+            information_retention_score=0.9,
+            compression_efficiency=0.95,
             overall_fidelity_score=0.9
         )
         
@@ -59,9 +58,9 @@ class TestMemoryFidelityMetrics:
         """Test diagnostics for poor memory fidelity performance"""
         metrics = MemoryFidelityMetrics(
             context_reread_rate=0.4,   # Poor
-            information_persistence_score=0.6,
-            tcil_score=0.65,  # Poor
-            compression_efficiency=0.6,
+            size_weighted_reread_penalty=0.3,
+            information_retention_score=0.6,
+            compression_efficiency=0.65,
             overall_fidelity_score=0.6
         )
         
@@ -187,8 +186,8 @@ class TestWorkingMemoryMetrics:
         """Create sample working memory metrics for testing"""
         fidelity = MemoryFidelityMetrics(
             context_reread_rate=0.1,
-            information_persistence_score=fidelity_score,
-            tcil_score=fidelity_score,
+            size_weighted_reread_penalty=0.05,
+            information_retention_score=fidelity_score,
             compression_efficiency=fidelity_score,
             overall_fidelity_score=fidelity_score
         )
@@ -326,7 +325,7 @@ class TestCheckpointEvaluationResult:
     def test_checkpoint_result_creation(self):
         """Test creating checkpoint evaluation result"""
         metrics = WorkingMemoryMetrics(
-            memory_fidelity=MemoryFidelityMetrics(0.1, 0.8, 0.9, 0.85, 0.8),
+            memory_fidelity=MemoryFidelityMetrics(0.1, 0.05, 0.8, 0.9, 0.8),
             contextual_relevance=ContextualRelevanceMetrics(0.8, 0.8, 0.8, 0.9, 0.85, 0.83),
             behavioral_integrity=BehavioralIntegrityMetrics(0.1, 0.05, 0.03, 0.9, 0.95, 0.85, 0.9, 0.87),
             task_completion_success=True
@@ -371,7 +370,7 @@ class TestTaskEvaluationResult:
         
         for i in range(1, count + 1):
             metrics = WorkingMemoryMetrics(
-                memory_fidelity=MemoryFidelityMetrics(0.1, 0.8, 0.9, 0.85, 0.8),
+                memory_fidelity=MemoryFidelityMetrics(0.1, 0.05, 0.8, 0.9, 0.8),
                 contextual_relevance=ContextualRelevanceMetrics(0.8, 0.8, 0.8, 0.9, 0.85, 0.83),
                 behavioral_integrity=BehavioralIntegrityMetrics(0.1, 0.05, 0.03, 0.9, 0.95, 0.85, 0.9, 0.87),
                 task_completion_success=True
@@ -537,7 +536,7 @@ class TestEvaluationSession:
         for i in range(1, 4):  # 3 checkpoints
             if success or i < 3:  # Fail on last checkpoint if not successful
                 metrics = WorkingMemoryMetrics(
-                    memory_fidelity=MemoryFidelityMetrics(0.1, 0.8, 0.9, 0.85, 0.8),
+                    memory_fidelity=MemoryFidelityMetrics(0.1, 0.05, 0.8, 0.9, 0.8),
                     contextual_relevance=ContextualRelevanceMetrics(0.8, 0.8, 0.8, 0.9, 0.85, 0.83),
                     behavioral_integrity=BehavioralIntegrityMetrics(0.1, 0.05, 0.03, 0.9, 0.95, 0.85, 0.9, 0.87),
                     task_completion_success=True

@@ -12,7 +12,7 @@ from unittest.mock import Mock, MagicMock
 
 from src.agents.simple_agent import SimpleWorkMemAgent, MockLLM
 from src.memory.reference_implementations import SimpleContextMemory
-from src.memory.memory_system import NoMemoryBaseline as NoMemory
+from src.memory.simple_memory import NoMemory
 from src.core.plugin_interfaces import PluginCapabilities
 from src.core.action_trace import ActionTracer, ActionType
 from src.core.task_specification import (
@@ -339,11 +339,19 @@ class TestSimpleWorkMemAgent:
     
     def test_task_execution(self):
         """Test execution of a complete task"""
-        # Create a mock action tracer
-        action_tracer = Mock()
-        
+        # Execute task by running checkpoints via async API
         task_spec = self._create_sample_task()
-        success = self.agent.execute_task(task_spec, action_tracer)
+
+        async def run_task():
+            # Store task context first (runner would normally do this)
+            self.agent._store_task_context(task_spec)
+            for cp in task_spec.checkpoints:
+                ok = await self.agent.execute_checkpoint(cp)
+                if not ok:
+                    return False
+            return True
+
+        success = asyncio.run(run_task())
         assert success is True
         
         # Should have stored task context in memory
@@ -369,14 +377,14 @@ class TestSimpleWorkMemAgent:
         self.agent.action_tracer = mock_tracer
         
         # Test logging different action types
-        self.agent._log_action(ActionType.FILE_READ, "test.py")
-        mock_tracer.log_action.assert_called_with(ActionType.FILE_READ, "test.py")
+        self.agent._log_action(ActionType.FILE_READ, success=True, file_path="test.py")
+        mock_tracer.log_action.assert_called_with(action_type=ActionType.FILE_READ, success=True, file_path="test.py")
         
-        self.agent._log_action(ActionType.PLANNING, "Planning step")
-        mock_tracer.log_action.assert_called_with(ActionType.PLANNING, "Planning step")
-    
-    def test_memory_system_integration(self):
-        """Test integration with different memory systems"""
+        self.agent._log_action(ActionType.FILE_WRITE, success=True, file_path="output.txt", size_bytes=100)
+        mock_tracer.log_action.assert_called_with(action_type=ActionType.FILE_WRITE, success=True, file_path="output.txt", size_bytes=100)
+        
+        self.agent._log_action(ActionType.ERROR_ENCOUNTERED, success=False, error_message="Test error")
+        mock_tracer.log_action.assert_called_with(action_type=ActionType.ERROR_ENCOUNTERED, success=False, file_path=None, error_message="Test error")
         # Test with NoMemory
         no_memory = NoMemory({})
         no_mem_agent = SimpleWorkMemAgent(no_memory, {})

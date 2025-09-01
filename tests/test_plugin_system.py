@@ -32,7 +32,6 @@ from src.core.action_trace import TaskTrace, ActionTracer
 
 # Test Memory System Implementations - using actual implementations
 from src.memory.reference_implementations import ExampleKeyValueMemory
-from src.memory.memory_system import NoMemoryBaseline
 
 
 class InvalidMemorySystem:

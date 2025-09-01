@@ -9,6 +9,7 @@ This validates that all components work together correctly.
 import asyncio
 import sys
 from pathlib import Path
+import pytest
 
 # Add src to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -16,10 +17,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from src.evaluation.runner import BasicWorkMemEvalRunner
 from src.agents.simple_agent import SimpleWorkMemAgent
 from src.memory.reference_implementations import SimpleContextMemory
-from src.memory.memory_system import NoMemoryBaseline as NoMemory
+from src.memory.simple_memory import NoMemory
 from src.evaluation.results import ComparisonResult
 
 
+@pytest.mark.asyncio
 async def test_basic_evaluation():
     """Test basic evaluation with SimpleWorkMemAgent and SimpleContextMemory"""
     print("=== Basic Evaluation Test ===")
@@ -52,6 +54,7 @@ async def test_basic_evaluation():
         return None
 
 
+@pytest.mark.asyncio
 async def test_memory_system_comparison():
     """Test comparison between different memory systems"""
     print("\n\n=== Memory System Comparison Test ===")
@@ -94,6 +97,7 @@ async def test_memory_system_comparison():
     return comparison
 
 
+@pytest.mark.asyncio
 async def test_task_loading():
     """Test task loading and validation"""
     print("\n\n=== Task Loading Test ===")
@@ -125,6 +129,7 @@ async def test_task_loading():
         return None
 
 
+@pytest.mark.asyncio
 async def test_invalid_task_handling():
     """Test handling of invalid task specifications"""
     print("\n\n=== Invalid Task Handling Test ===")
