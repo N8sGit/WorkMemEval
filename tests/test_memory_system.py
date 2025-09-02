@@ -16,12 +16,12 @@ from unittest.mock import Mock
 from src.memory.memory_system import (
     PluginCapabilities,
     MemorySystem,
-    NoMemoryBaseline,
     MemorySystemInterface,
     MemorySystemFactory,
     MemorySystemError
 )
 from src.memory.reference_implementations import ExampleKeyValueMemory, SimpleContextMemory
+from src.memory.simple_memory import NoMemory
 
 
 class TestPluginCapabilities:
@@ -91,79 +91,6 @@ class TestMemorySystemAbstract:
             memory.compress_memory()
 
 
-class TestNoMemoryBaseline:
-    """Test the no-memory baseline implementation"""
-    
-    def test_initialization(self):
-        """Test NoMemoryBaseline initialization"""
-        config = {'test_param': 'test_value'}
-        memory = NoMemoryBaseline(config)
-        
-        assert memory.config == config
-        assert memory.operation_count == 0
-        assert isinstance(memory.created_at, float)
-    
-    def test_capabilities(self):
-        """Test that NoMemoryBaseline reports correct capabilities"""
-        memory = NoMemoryBaseline({})
-        caps = memory.get_capabilities()
-        
-        assert caps.supports_introspection is True
-        assert caps.supports_search is False
-        assert caps.supports_persistence is False
-    
-    def test_store_information_discards_everything(self):
-        """Test that store_information discards everything but returns success"""
-        memory = NoMemoryBaseline({})
-        
-        result = memory.store_information("test_key", "test_value", {"context": "test"})
-        
-        assert result is True
-        assert memory.operation_count == 1
-        
-        # Verify nothing is actually stored by checking snapshot
-        snapshot = memory.get_memory_snapshot()
-        assert snapshot['total_items'] == 0
-    
-    def test_retrieve_information_returns_empty(self):
-        """Test that retrieve_information always returns empty list"""
-        memory = NoMemoryBaseline({})
-        
-        # Store something first
-        memory.store_information("test_key", "test_value", {})
-        
-        # Try to retrieve
-        results = memory.retrieve_information("test_value", {})
-        
-        assert results == []
-        assert memory.operation_count == 2  # One store, one retrieve
-    
-    def test_memory_snapshot(self):
-        """Test memory snapshot format and content"""
-        memory = NoMemoryBaseline({})
-        memory.store_information("key", "value", {})  # This should be discarded
-        
-        snapshot = memory.get_memory_snapshot()
-        
-        assert snapshot['total_items'] == 0
-        assert snapshot['memory_size_bytes'] == 0
-        assert snapshot['memory_type'] == 'no_memory_baseline'
-        assert snapshot['operation_count'] == 1
-        assert 'capabilities' in snapshot
-        assert isinstance(snapshot['last_accessed'], float)
-    
-    def test_memory_stats(self):
-        """Test memory statistics"""
-        memory = NoMemoryBaseline({})
-        memory.store_information("key", "value", {})
-        memory.retrieve_information("query", {})
-        
-        stats = memory.get_memory_stats()
-        
-        assert stats['memory_efficiency'] == 0.0
-        assert stats['recall_success_rate'] == 0.0
-        assert stats['false_positive_rate'] == 0.0
-        assert stats['false_negative_rate'] == 1.0
 
 
 class TestExampleKeyValueMemory:
@@ -496,7 +423,7 @@ class TestMemorySystemFactory:
         interface = MemorySystemFactory.create_memory_system('no_memory', config)
         
         assert isinstance(interface, MemorySystemInterface)
-        assert isinstance(interface.memory_system, NoMemoryBaseline)
+        assert isinstance(interface.memory_system, NoMemory)
         assert interface.memory_system.config == config
     
     def test_create_unknown_memory_system(self):
