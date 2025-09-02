@@ -19,3 +19,4 @@ evaluation_runs/
 evaluation_workspace/
 dist/
 build/
+.env

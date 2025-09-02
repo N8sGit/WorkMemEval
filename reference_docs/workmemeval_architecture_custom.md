@@ -64,7 +64,7 @@ class MemorySystem(ABC):
         pass
 
 # Reference implementations available:
-# - NoMemoryBaseline: Complete memory absence (baseline)
+# - NoMemory: Complete memory absence (baseline)
 # - SimpleContextMemory: Basic keyword-based retrieval
 # - CompressedMemory: Memory with overflow compression
 ```
@@ -292,7 +292,7 @@ class EmbeddingMemorySystem(MemorySystem):
 ```python
 # Example: Comparing memory systems
 memory_systems = [
-    ('NoMemory', NoMemoryBaseline({})),
+    ('NoMemory', NoMemory({})),
     ('SimpleContext', SimpleContextMemory({'max_items': 100})),
     ('Embedding', EmbeddingMemorySystem({'model': 'all-MiniLM-L6-v2'}))
 ]
