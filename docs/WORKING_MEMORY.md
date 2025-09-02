@@ -110,11 +110,10 @@ Implementation reference:
   - Before executing a CONTEXT_SWITCH challenge, the runner logs a ContextSnapshot using files accessed so far in the checkpoint
   - Improves RSR recall/fidelity by providing a pre-switch files_in_context reference
 
-- Legacy surfacing (flat fields)
-  - After three-pillar evaluation, the runner surfaces:
-    - update_robustness_overall, update_robustness_binary_success_rate
-    - resumption_success_overall, resumption_success_binary_success_rate
-  - These augment the basic working_memory_metrics map for backward compatibility
+
+- Error handling
+  - Checkpoint exceptions are logged and then propagated by the runner (strict behavior). This ensures tests and
+    orchestrations that expect exceptions to bubble up work as intended.
 
 Implementation reference:
 - src/evaluation/runner.py (see BasicWorkMemEvalRunner docstring and logic around PLANNING, snapshots, and legacy fields)
@@ -127,7 +126,7 @@ Implementation reference:
 - Moderate: ≥ 0.50
 - Poor: < 0.50
 
-Consider both continuous metric value and binary_success_rate:
+Consider both continuous metric value and binary_success_rate within each metric’s details:
 - A higher continuous value without binary_success may indicate partial adaptation (e.g., quick writes) but lack of verified correctness
 - Binary success highlights objective signals (tests passing for UR; explicit resume success for RSR)
 
@@ -164,22 +163,52 @@ Consider both continuous metric value and binary_success_rate:
 ## Result structure overview
 
 EvaluationResult (src/evaluation/results.py) includes:
-- working_memory_metrics: legacy flat metrics (augmented with UR/RSR overall and binary_success_rate fields)
 - three_pillar_evaluation: structured evaluation (if available)
+- working_memory_metrics: reserved for basic/legacy metrics (empty by default)
 - task_trace: serialized TaskTrace, including memory_challenge_responses and context snapshots
 
-UR/RSR legacy flat fields added by the runner:
-- update_robustness_overall
-- update_robustness_binary_success_rate
-- resumption_success_overall
-- resumption_success_binary_success_rate
+### Recording Formats
+
+The evaluation system now supports multiple recording formats to optimize storage:
+
+**Compact Format (default)**
+- **Size reduction**: ~25x smaller than legacy format
+- **Compression**: Additional 2.6x with zlib compression
+- **Data retention**: All essential metrics and context preserved
+- **File naming**: `{timestamp}_compact.json` or `{timestamp}_compact.json.gz`
+
+**Legacy Format**
+- **File naming**: `{timestamp}.json`
+- **Use case**: Backward compatibility during migration
+- **Size**: Original verbose format with full trace details
+
+**Configuration**
+```bash
+# CLI usage
+python3 -m src.cli run --task tasks/simple_calculator.json --recording-mode compact
+python3 -m src.cli run --task tasks/simple_calculator.json --recording-mode legacy
+python3 -m src.cli run --task tasks/simple_calculator.json --recording-mode both
+```
+
+**Storage Statistics**
+- Legacy: ~890 bytes per simple task
+- Compact: ~850 bytes per simple task  
+- Compressed: ~337 bytes per simple task
+
+### Migration Support
+
+For existing evaluation runs, use the migration adapter:
+```python
+from evaluation.migration_adapter import LegacyAdapter
+adapter = LegacyAdapter()
+adapter.batch_migrate_directory("evaluation_runs")
+```
 
 
 ## File references
 
 - Metrics and evaluation:
-  - src/evaluation/memory_metrics.py
-  - src/evaluation/metrics.py (plan compliance computation)
+  - src/evaluation/memory_metrics.py (includes native plan compliance)
 - Runner orchestration and results:
   - src/evaluation/runner.py
   - src/evaluation/results.py
@@ -193,9 +222,10 @@ UR/RSR legacy flat fields added by the runner:
 - Use containerized execution (default) to minimize environment variance
 - Ensure tasks define clear tests; UR benefits from passing TEST_RUN signals
 - Provide pre-switch ContextSnapshots (or rely on runner capture) for better RSR fidelity/recall confidence
+- Control file size warnings from synthetic file ops via WM_WARN_SIZE_BYTES=1 (default suppressed)
 
 
 ## Changelog note
 
-- The runner now logs a baseline plan and a pre-context-switch snapshot and surfaces UR/RSR legacy fields. If you have agents that already log detailed plans or snapshots, you can adapt the runner accordingly (e.g., disable baseline plan logging) to avoid duplication.
+- The runner now logs a baseline plan and a pre-context-switch snapshot. If you have agents that already log detailed plans or snapshots, you can adapt the runner accordingly (e.g., disable baseline plan logging) to avoid duplication.
 

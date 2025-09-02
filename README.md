@@ -58,6 +58,25 @@ docker compose -f docker/compose.dev.yml run --rm eval "pytest -q /workspace/tes
 - Results are written to `evaluation_runs/<task_id>/<timestamp>.json`
 - The working directory for a run defaults to `evaluation_workspace/<task_id>` unless you pass `--workspace`.
 
+#### Recording Formats
+The system supports multiple recording formats to optimize storage:
+
+- **Compact format** (default): ~25x smaller than legacy, preserves all metrics
+- **Legacy format**: Original verbose format for backward compatibility
+- **Compressed format**: Additional zlib compression for maximum space savings
+
+Configure via CLI:
+```bash
+# Use compact format (default)
+python3 -m src.cli run --task tasks/simple_calculator.json --recording-mode compact
+
+# Use legacy format
+python3 -m src.cli run --task tasks/simple_calculator.json --recording-mode legacy
+
+# Use both formats during migration
+python3 -m src.cli run --task tasks/simple_calculator.json --recording-mode both
+```
+
 ## Security notes
 - SecureFileOperations restricts agent file I/O to the working directory with path validation, extension allow-listing, and size limits.
 - Containerized tests add OS-level isolation and resource controls.
@@ -94,10 +113,17 @@ Runner behavior to support these metrics:
   consistent source when agents do not log plans.
 - Before a context switch challenge, the runner logs a pre-switch ContextSnapshot based on files accessed so far in
   the checkpoint; this improves recall/fidelity confidence in RSR.
-- Optional (deprecated): you can surface a subset of three-pillar metrics into the flat working_memory_metrics by
-  constructing the runner with surface_legacy_metrics=True. When enabled, the following fields may be included:
-  - update_robustness_overall, update_robustness_binary_success_rate
-  - resumption_success_overall, resumption_success_binary_success_rate
+- The runner computes the full three-pillar evaluation after execution regardless of test success. This lets you diagnose failures as well as successes.
+
+Additional notes:
+- File size warnings for synthetic file operations are suppressed by default; set WM_WARN_SIZE_BYTES=1 to re-enable.
+
+More details: see docs/WORKING_MEMORY.md for a deep dive (components, weights, and examples).
+
+## CI overview
+## Memory systems (notes)
+
+- NoMemoryBaseline is deprecated; prefer src/memory/simple_memory.py:NoMemory. The factory maps "no_memory" to NoMemory.
 
 ## CI overview
 - CI builds the evaluation image and runs the test suite inside the container (network disabled) for deterministic results.

@@ -19,7 +19,8 @@ import asyncio
 
 from .evaluation.runner import BasicWorkMemEvalRunner
 from .agents.simple_agent import SimpleWorkMemAgent
-from .memory.simple_memory import SimpleContextMemory
+from .agents.real_agent import RealAgent
+from .memory.reference_implementations import SimpleContextMemory
 from .evaluation.results import EvaluationResult, ComparisonResult
 
 
@@ -27,21 +28,48 @@ def cmd_run(args: argparse.Namespace) -> int:
     task_path = Path(args.task)
     working_directory = Path(args.workspace) if args.workspace else None
 
-    memory = SimpleContextMemory({'max_items': 100})
-    agent = SimpleWorkMemAgent(memory, {
-        'max_iterations': 10,
-        'memory_context_limit': 5,
-        'llm_config': {'response_delay': 0.0}
-    })
+    # Select agent based on arguments
+    if args.agent == 'real':
+        memory = SimpleContextMemory(config={'max_items': 100})
+        agent = RealAgent(memory, {
+            'model': args.model or 'moonshotai/kimi-k2',
+            'temperature': 0.1,
+            'max_tokens': 4000
+        })
+    else:
+        memory = SimpleContextMemory(config={'max_items': 100})
+        agent = SimpleWorkMemAgent(memory, {
+            'max_iterations': 10,
+            'memory_context_limit': 5,
+            'llm_config': {'response_delay': 0.0}
+        })
 
     runner = BasicWorkMemEvalRunner(containerized=getattr(args, 'container', False), docker_image=getattr(args, 'docker_image', None))
 
-    async def _run():
-        result = await runner.run_evaluation(task_path, agent, memory, working_directory=working_directory)
-        result.print_summary()
+    try:
+        from evaluation.integration_runner import CompactEvaluationRunner
+        
+        # Use compact recording system
+        compact_runner = CompactEvaluationRunner()
+        result_path = compact_runner.run_evaluation(
+            task_id=task_path.stem,
+            agent_name=args.agent,
+            task_result=runner.run_evaluation(
+                task_path, agent, memory, working_directory=working_directory
+            ),
+            recording_mode=args.recording_mode
+        )
+        
+        print(f"Evaluation complete. Results saved to: {result_path}")
         return 0
 
-    return asyncio.run(_run())
+    except ImportError:
+        async def _run():
+            result = await runner.run_evaluation(task_path, agent, memory, working_directory=working_directory)
+            result.print_summary()
+            return 0
+
+        return asyncio.run(_run())
 
 
 def _gather_result_files(paths: List[Path]) -> List[Path]:
@@ -76,23 +104,34 @@ def cmd_compare(args: argparse.Namespace) -> int:
 
 
 def main(argv: List[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog='WorkMemEval CLI')
-    sub = parser.add_subparsers(dest='command', required=True)
+    parser = argparse.ArgumentParser(description='WorkMemEval CLI')
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
-    p_run = sub.add_parser('run', help='Run an evaluation for a task')
-    p_run.add_argument('--task', required=True, help='Path to task JSON')
-    p_run.add_argument('--workspace', help='Working directory for execution (optional)')
-    group = p_run.add_mutually_exclusive_group()
-    group.add_argument('--container', dest='container', action='store_true', help='Run tests inside Docker (default)')
-    group.add_argument('--no-container', dest='container', action='store_false', help='Run tests locally without Docker')
-    p_run.add_argument('--docker-image', default='workmemeval/eval:local', help='Docker image to use when running containerized')
-    p_run.set_defaults(func=cmd_run, container=True)
+    # Run command
+    run_parser = subparsers.add_parser('run', help='Run evaluation with agent')
+    run_parser.add_argument('--task', required=True, help='Task JSON file')
+    run_parser.add_argument('--workspace', help='Working directory (optional)')
+    run_parser.add_argument('--agent', choices=['simple', 'real'], default='simple',
+                           help='Agent to use (simple or real)')
+    run_parser.add_argument('--model', help='LLM model for real agent')
+    run_parser.add_argument('--container', action='store_true', help='Run in Docker container')
+    run_parser.add_argument("--recording-mode", choices=["compact", "legacy", "both", "summary", "debug"],
+                        default="compact", help="Recording format for evaluation results (default: compact)")
+    run_parser.add_argument("--compress", action="store_true", help="Enable compression for compact recordings")
+    run_parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+    run_parser.add_argument('--docker-image', default="workmemeval/eval:local",
+                        help="Docker image to use for containerized runs (default: workmemeval/eval:local)")
+    run_parser.set_defaults(func=cmd_run)
 
-    p_cmp = sub.add_parser('compare', help='Compare one or more evaluation result files or directories')
-    p_cmp.add_argument('paths', nargs='+', help='Result JSON files or directories containing JSON results')
-    p_cmp.set_defaults(func=cmd_compare)
+    # Compare command
+    compare_parser = subparsers.add_parser('compare', help='Compare evaluation results')
+    compare_parser.add_argument('paths', nargs='+', help='Result JSON files or directories containing JSON results')
+    compare_parser.set_defaults(func=cmd_compare)
 
     args = parser.parse_args(argv)
+    if not hasattr(args, 'func'):
+        parser.print_help()
+        return 1
     return args.func(args)
 
 
