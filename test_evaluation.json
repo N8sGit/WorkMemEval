@@ -1,0 +1,43 @@
+{
+  "task_id": "test_task_001",
+  "agent": "test_agent",
+  "memory_system": "test_memory",
+  "success": true,
+  "duration": 45.2,
+  "checkpoints": [
+    {
+      "id": "cp1",
+      "actions": 8,
+      "files_accessed": [
+        "file1.py",
+        "file2.py"
+      ],
+      "files_reread": [],
+      "errors": [],
+      "success": true,
+      "duration_ms": 20100
+    },
+    {
+      "id": "cp2",
+      "actions": 7,
+      "files_accessed": [
+        "file2.py",
+        "file3.py"
+      ],
+      "files_reread": [
+        "file2.py"
+      ],
+      "errors": [
+        "syntax_error"
+      ],
+      "success": true,
+      "duration_ms": 25100
+    }
+  ],
+  "metrics": {
+    "memory_fidelity": 0.85,
+    "contextual_relevance": 0.92,
+    "behavioral_integrity": 0.78
+  },
+  "summary_hash": "test_hash_123"
+}
