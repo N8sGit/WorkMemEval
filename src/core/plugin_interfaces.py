@@ -7,12 +7,18 @@ a wide range of implementations without assumptions.
 """
 
 from abc import ABC, abstractmethod
+import typing
 from typing import Dict, Any, List, Optional, Set
 from dataclasses import dataclass
 import time
 
 # Import the new memory system architecture
 from ..memory.memory_system import MemorySystem, PluginCapabilities, MemorySystemInterface
+
+# Forward references for type hints
+if typing.TYPE_CHECKING:
+    from ..evaluation.task_specification import CheckpointSpecification
+    from ..evaluation.action_trace import TaskTrace
 
 
 # Re-export PluginCapabilities from memory_system for backward compatibility

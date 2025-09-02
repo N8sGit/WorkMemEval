@@ -135,65 +135,6 @@ class MemorySystem(ABC):
         raise NotImplementedError("Memory consolidation not supported by this system")
 
 
-class NoMemoryBaseline(MemorySystem):
-    """
-    Baseline system with no memory capability (deprecated).
-    
-    Deprecated: use src.memory.simple_memory.NoMemory instead. This class
-    remains for compatibility and will be removed in a future release.
-    """
-    
-    def __init__(self, config: Dict[str, Any]):
-        import warnings
-        warnings.warn(
-            "NoMemoryBaseline is deprecated; use src.memory.simple_memory.NoMemory",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(config)
-        self.operation_count = 0
-        
-    def get_capabilities(self) -> PluginCapabilities:
-        """No capabilities except basic introspection"""
-        return PluginCapabilities(
-            supports_introspection=True  # We can report our lack of memory
-        )
-    
-    def store_information(self, key: str, value: Any, context: Dict[str, Any]) -> bool:
-        """Discard everything immediately"""
-        self.operation_count += 1
-        return True  # Pretend it worked
-        
-    def retrieve_information(self, query: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Never retrieve anything"""
-        self.operation_count += 1
-        return []
-        
-    def get_memory_snapshot(self) -> Dict[str, Any]:
-        """Report complete absence of memory"""
-        return {
-            'total_items': 0,
-            'memory_size_bytes': 0,
-            'last_accessed': time.time(),
-            'operation_count': self.operation_count,
-            'memory_type': 'no_memory_baseline',
-            'capabilities': self.get_capabilities().__dict__
-        }
-    
-    def clear_memory(self) -> bool:
-        """Clear memory - no-op since there's no memory to clear"""
-        return True
-    
-    def get_memory_stats(self) -> Dict[str, Any]:
-        """Baseline stats showing no memory activity"""
-        return {
-            'storage_operations': self.operation_count,
-            'retrieval_operations': self.operation_count,
-            'memory_efficiency': 0.0,
-            'recall_success_rate': 0.0,
-            'false_positive_rate': 0.0,  # Never returns anything, so no false positives
-            'false_negative_rate': 1.0   # Never returns anything, so everything is missed
-        }
 
 
 class MemorySystemInterface:
@@ -404,7 +345,8 @@ class MemorySystemFactory:
     """Factory for creating memory system instances"""
     
     _registry = {
-        'no_memory': NoMemoryBaseline,
+        # Keep 'no_memory' discoverable while lazily instantiating NoMemory in create_memory_system
+        'no_memory': None,
     }
     
     @classmethod
@@ -421,7 +363,14 @@ class MemorySystemFactory:
             raise ValueError(f"Unknown memory type: {memory_type}. "
                            f"Available types: {list(cls._registry.keys())}")
         
-        memory_system = cls._registry[memory_type](config)
+        # Use modern NoMemory implementation for the 'no_memory' baseline
+        if memory_type == 'no_memory':
+            # Lazy import to avoid circular dependency at module import time
+            from .simple_memory import NoMemory
+            memory_system = NoMemory(config)
+        else:
+            memory_cls = cls._registry[memory_type]
+            memory_system = memory_cls(config)
         return MemorySystemInterface(memory_system)
     
     @classmethod
