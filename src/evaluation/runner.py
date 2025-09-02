@@ -168,9 +168,8 @@ class BasicWorkMemEvalRunner:
     - Pre-context-switch snapshot: Before executing a CONTEXT_SWITCH challenge, the runner logs a ContextSnapshot
       using files accessed so far in the checkpoint. This improves RSR recall/fidelity metrics by providing a
       pre-switch files_in_context reference.
-    - Legacy surfacing: After three-pillar evaluation, the runner surfaces update_robustness_overall,
-      resumption_success_overall, and their binary_success_rate counterparts in the flat working_memory_metrics for
-      backward compatibility.
+    - Three-pillar evaluation: After execution, the runner computes the full three-pillar working memory evaluation
+      regardless of test success, so failures can still yield diagnostic insights.
     """
     
     def __init__(self, containerized: bool = False, docker_image: Optional[str] = None):
@@ -258,45 +257,15 @@ class BasicWorkMemEvalRunner:
             legacy_metrics: Dict[str, float] = {}
             three_pillar_eval = None
             
-            # Only compute three-pillar metrics if task was successful (gating)
-            if success:
-                try:
-                    three_pillar_eval = self.working_memory_engine.evaluate_working_memory(
-                        task_trace, 
-                        task_spec, 
-                        agent_name=agent.__class__.__name__
-                    )
-                    # Best-effort: surface key challenge-driven metrics in flat legacy metrics for compatibility
-                    try:
-                        bi_metrics = getattr(three_pillar_eval, 'behavioral_integrity', None)
-                        if bi_metrics and hasattr(bi_metrics, 'metrics'):
-                            for m in bi_metrics.metrics:
-                                if getattr(m, 'name', '') == 'update_robustness':
-                                    try:
-                                        coverage = int(m.details.get('coverage', 0))
-                                    except Exception:
-                                        coverage = 0
-                                    if coverage > 0:
-                                        legacy_metrics['update_robustness_overall'] = m.value
-                                        try:
-                                            legacy_metrics['update_robustness_binary_success_rate'] = float(m.details.get('binary_success_rate', 0.0))
-                                        except Exception:
-                                            pass
-                                if getattr(m, 'name', '') == 'resumption_success_rate':
-                                    try:
-                                        coverage = int(m.details.get('coverage', 0))
-                                    except Exception:
-                                        coverage = 0
-                                    if coverage > 0:
-                                        legacy_metrics['resumption_success_overall'] = m.value
-                                        try:
-                                            legacy_metrics['resumption_success_binary_success_rate'] = float(m.details.get('binary_success_rate', 0.0))
-                                        except Exception:
-                                            pass
-                    except Exception:
-                        pass
-                except Exception as e:
-                    print(f"Warning: Three-pillar evaluation failed: {e}")
+            # Always attempt to compute three-pillar metrics for diagnostic insight
+            try:
+                three_pillar_eval = self.working_memory_engine.evaluate_working_memory(
+                    task_trace, 
+                    task_spec, 
+                    agent_name=agent.__class__.__name__
+                )
+            except Exception as e:
+                print(f"Warning: Three-pillar evaluation failed: {e}")
             
             # Create evaluation result
             evaluation_result = EvaluationResult(

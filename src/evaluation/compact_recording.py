@@ -6,6 +6,7 @@ while preserving all essential data for working memory analysis.
 """
 
 import json
+import re
 import zlib
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
