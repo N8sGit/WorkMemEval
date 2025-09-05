@@ -7,6 +7,7 @@ and evaluation of memory systems without external dependencies.
 
 import asyncio
 import json
+import logging
 import re
 import time
 from typing import Dict, Any, List, Optional, Tuple
@@ -15,6 +16,8 @@ from pathlib import Path
 from ..core.plugin_interfaces import AgentImplementation, MemorySystem, PluginCapabilities
 from ..core.action_trace import ActionTracer, ActionType, TaskTrace, CheckpointTrace
 from ..core.task_specification import TaskSpecification, CheckpointSpecification
+from ..core.llm_interfaces import LLMInterface, LLMConfig, LLMProvider
+from ..llm import LLMFactory
 from .secure_file_ops import SecureFileOperations, SecurityViolationError
 
 
@@ -139,9 +142,12 @@ class SimpleWorkMemAgent(AgentImplementation):
     def __init__(self, memory_system: MemorySystem, config: Dict[str, Any]):
         super().__init__(memory_system, config)
         
-        # Initialize mock LLM
+        # Initialize logger
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        
+        # Initialize LLM provider
         llm_config = config.get('llm_config', {})
-        self.llm = MockLLM(llm_config)
+        self.llm = self._initialize_llm_provider(llm_config)
         
         # Agent configuration
         self.max_iterations = config.get('max_iterations', 50)
@@ -167,6 +173,53 @@ class SimpleWorkMemAgent(AgentImplementation):
             self.memory_interface = memory_system
         else:
             self.memory_interface = MemorySystemInterface(memory_system)
+    
+    def _initialize_llm_provider(self, llm_config: Dict[str, Any]) -> LLMInterface:
+        """Initialize LLM provider based on configuration"""
+        # Default configuration
+        provider_type = llm_config.get('provider', 'mock')
+        model = llm_config.get('model', 'gpt-4o-mini')
+        
+        if provider_type == 'mock' or provider_type is None:
+            # Use mock provider for testing/development
+            config = LLMConfig(
+                provider=LLMProvider.MOCK,
+                model=model,
+                provider_config=llm_config
+            )
+            return LLMFactory.create_provider(config)
+        
+        elif provider_type == 'openai':
+            # Use OpenAI provider
+            api_key = llm_config.get('api_key')
+            return LLMFactory.create_openai(
+                model=model,
+                api_key=api_key,
+                temperature=llm_config.get('temperature', 0.1),
+                max_tokens=llm_config.get('max_tokens', 4000),
+                timeout_seconds=llm_config.get('timeout_seconds', 60)
+            )
+        
+        elif provider_type == 'openrouter':
+            # Use OpenRouter provider
+            api_key = llm_config.get('api_key')
+            return LLMFactory.create_openrouter(
+                model=model,
+                api_key=api_key,
+                temperature=llm_config.get('temperature', 0.1),
+                max_tokens=llm_config.get('max_tokens', 4000),
+                timeout_seconds=llm_config.get('timeout_seconds', 60)
+            )
+        
+        else:
+            # Fallback to mock for unknown providers
+            self.logger.warning(f"Unknown LLM provider '{provider_type}', falling back to mock")
+            config = LLMConfig(
+                provider=LLMProvider.MOCK,
+                model=model,
+                provider_config=llm_config
+            )
+            return LLMFactory.create_provider(config)
     
     def initialize_secure_file_ops(self, working_directory: Path) -> None:
         """Initialize secure file operations for the given working directory"""
@@ -216,10 +269,10 @@ class SimpleWorkMemAgent(AgentImplementation):
             context = self._retrieve_relevant_context(checkpoint)
             
             # Plan the checkpoint execution
-            plan = self._plan_checkpoint_execution(checkpoint, context)
+            plan = await self._plan_checkpoint_execution(checkpoint, context)
             
             # Execute the plan
-            success = self._execute_plan(checkpoint, plan)
+            success = await self._execute_plan(checkpoint, plan)
             
             # If we started the checkpoint here, complete it here as well
             if started_here and self.action_tracer:
@@ -294,7 +347,7 @@ class SimpleWorkMemAgent(AgentImplementation):
         
         return context
     
-    def _plan_checkpoint_execution(self, checkpoint: CheckpointSpecification, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _plan_checkpoint_execution(self, checkpoint: CheckpointSpecification, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Plan the execution steps for a checkpoint"""
         # Create a prompt for the LLM to plan execution
         prompt = f"""
@@ -311,11 +364,12 @@ Context from memory:
 What steps should I take to complete this checkpoint?
 """
         
-        response = self.llm.generate_response(prompt, context)
+        response = await self.llm.generate_response(prompt, context)
+        response_content = response.content if hasattr(response, 'content') else str(response)
         # Log planning with structured plan metadata for metrics
         if self.action_tracer:
             # Include a trimmed version of the plan in metadata
-            prospective_plan = self._parse_plan_from_response(response, checkpoint)
+            prospective_plan = self._parse_plan_from_response(response_content, checkpoint)
             self.action_tracer.log_action(
                 ActionType.PLANNING,
                 success=True,
@@ -324,7 +378,7 @@ What steps should I take to complete this checkpoint?
             )
         
         # Convert LLM response to execution plan
-        plan = self._parse_plan_from_response(response, checkpoint)
+        plan = self._parse_plan_from_response(response_content, checkpoint)
         return plan
     
     def _parse_plan_from_response(self, response: str, checkpoint: CheckpointSpecification) -> List[Dict[str, Any]]:
@@ -358,16 +412,16 @@ What steps should I take to complete this checkpoint?
         
         return plan
     
-    def _execute_plan(self, checkpoint: CheckpointSpecification, plan: List[Dict[str, Any]]) -> bool:
+    async def _execute_plan(self, checkpoint: CheckpointSpecification, plan: List[Dict[str, Any]]) -> bool:
         """Execute the planned steps"""
         for step in plan:
-            success = self._execute_step(step)
+            success = await self._execute_step(step)
             if not success:
                 return False
         
         return True
     
-    def _execute_step(self, step: Dict[str, Any]) -> bool:
+    async def _execute_step(self, step: Dict[str, Any]) -> bool:
         """Execute a single step in the plan"""
         action = step.get('action')
         
@@ -379,7 +433,7 @@ What steps should I take to complete this checkpoint?
             elif action == 'edit_file':
                 return self._edit_file(step['file_path'], step.get('changes', ''))
             elif action == 'implement':
-                return self._implement_functionality(step['description'])
+                return await self._implement_functionality(step['description'])
             else:
                 self._log_action(
                     ActionType.ERROR_ENCOUNTERED, 
@@ -575,17 +629,18 @@ What steps should I take to complete this checkpoint?
             )
             return False
     
-    def _implement_functionality(self, description: str) -> bool:
+    async def _implement_functionality(self, description: str) -> bool:
         """Implement functionality based on description"""
         try:
             # Use LLM to generate implementation
             prompt = f"Implement the following functionality: {description}"
-            response = self.llm.generate_response(prompt)
+            response = await self.llm.generate_response(prompt)
+            response_content = response.content if hasattr(response, 'content') else str(response)
             
             # Store implementation in memory
             self.memory_interface.store(
                 f"implementation_{hash(description)}",
-                response,
+                response_content,
                 {'type': 'implementation', 'description': description, 'timestamp': time.time()}
             )
             
@@ -593,7 +648,10 @@ What steps should I take to complete this checkpoint?
                 ActionType.LLM_CALL, 
                 success=True,
                 description=description,
-                response_length=len(response) if response else 0
+                response_length=len(response_content) if response_content else 0,
+                llm_model=response.model if hasattr(response, 'model') else 'unknown',
+                llm_tokens_used=response.usage.get('total_tokens', 0) if hasattr(response, 'usage') else 0,
+                llm_cost_usd=response.cost_usd if hasattr(response, 'cost_usd') else 0.0
             )
             return True
             

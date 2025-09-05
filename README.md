@@ -121,6 +121,59 @@ Additional notes:
 More details: see docs/WORKING_MEMORY.md for a deep dive (components, weights, and examples).
 
 ## CI overview
+## LLM Integration
+
+WorkMemEval now supports real language models as first-class components:
+
+### Supported Providers
+- **OpenAI**: GPT-4o, GPT-4o-mini, GPT-4, GPT-3.5-turbo
+- **OpenRouter**: Claude-3 models, Llama models, and other open-source options
+- **Mock**: Deterministic responses for testing (no API key required)
+
+### Configuration
+
+```python
+# OpenAI configuration
+openai_config = {
+    'llm_config': {
+        'provider': 'openai',
+        'model': 'gpt-4o-mini',
+        'temperature': 0.1,
+        'max_tokens': 4000
+    }
+}
+
+# OpenRouter configuration
+openrouter_config = {
+    'llm_config': {
+        'provider': 'openrouter',
+        'model': 'anthropic/claude-3-haiku',
+        'temperature': 0.1,
+        'max_tokens': 4000
+    }
+}
+
+# Mock configuration (for testing)
+mock_config = {
+    'llm_config': {
+        'provider': 'mock',
+        'model': 'test-model',
+        'response_delay': 0.0
+    }
+}
+```
+
+### Environment Variables
+```bash
+# For OpenAI
+export OPENAI_API_KEY="your-openai-api-key"
+
+# For OpenRouter
+export OPENROUTER_API_KEY="your-openrouter-api-key"
+```
+
+See `examples/llm_config_example.py` for complete configuration examples.
+
 ## Memory systems (notes)
 
 - NoMemoryBaseline is deprecated; prefer src/memory/simple_memory.py:NoMemory. The factory maps "no_memory" to NoMemory.

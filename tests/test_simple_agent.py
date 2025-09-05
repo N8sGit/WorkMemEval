@@ -11,6 +11,8 @@ import asyncio
 from unittest.mock import Mock, MagicMock
 
 from src.agents.simple_agent import SimpleWorkMemAgent, MockLLM
+from src.llm.mock_provider import MockProvider
+from src.core.llm_interfaces import LLMInterface
 from src.memory.reference_implementations import SimpleContextMemory
 from src.memory.simple_memory import NoMemory
 from src.core.plugin_interfaces import PluginCapabilities
@@ -123,7 +125,11 @@ class TestSimpleWorkMemAgent:
         self.agent = SimpleWorkMemAgent(self.memory, {
             'max_iterations': 10,
             'memory_context_limit': 5,
-            'llm_config': {'response_delay': 0.0}
+            'llm_config': {
+                'provider': 'mock',
+                'model': 'test-model',
+                'response_delay': 0.0
+            }
         })
     
     def test_agent_creation(self):
@@ -132,7 +138,7 @@ class TestSimpleWorkMemAgent:
         assert self.agent.memory_system is self.memory
         assert self.agent.max_iterations == 10
         assert self.agent.memory_context_limit == 5
-        assert isinstance(self.agent.llm, MockLLM)
+        assert isinstance(self.agent.llm, LLMInterface)
     
     def test_agent_capabilities(self):
         """Test agent capabilities"""
