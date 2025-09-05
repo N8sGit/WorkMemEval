@@ -15,6 +15,8 @@ from pathlib import Path
 from ..core.plugin_interfaces import AgentImplementation, MemorySystem, PluginCapabilities
 from ..core.action_trace import ActionTracer, ActionType, TaskTrace, CheckpointTrace
 from ..core.task_specification import TaskSpecification, CheckpointSpecification
+from ..core.llm_interfaces import LLMConfig, LLMProvider
+from ..llm import LLMFactory
 from .secure_file_ops import SecureFileOperations, SecurityViolationError
 
 
@@ -139,9 +141,9 @@ class SimpleWorkMemAgent(AgentImplementation):
     def __init__(self, memory_system: MemorySystem, config: Dict[str, Any]):
         super().__init__(memory_system, config)
         
-        # Initialize mock LLM
-        llm_config = config.get('llm_config', {})
-        self.llm = MockLLM(llm_config)
+        # Initialize LLM provider
+        llm_config = config.get('llm_config', {'provider': 'mock', 'model': 'test-model'})
+        self.llm = self._initialize_llm_provider(llm_config)
         
         # Agent configuration
         self.max_iterations = config.get('max_iterations', 50)
@@ -159,6 +161,21 @@ class SimpleWorkMemAgent(AgentImplementation):
         
         # Enable secure file operations if requested
         self.use_secure_file_ops = config.get('use_secure_file_ops', True)
+    
+    def _initialize_llm_provider(self, llm_config: Dict[str, Any]):
+        """Initialize LLM provider based on configuration"""
+        provider = llm_config.get('provider', 'mock')
+        model = llm_config.get('model', 'test-model')
+        
+        config = LLMConfig(
+            provider=LLMProvider(provider),
+            model=model,
+            temperature=llm_config.get('temperature', 0.1),
+            max_tokens=llm_config.get('max_tokens', 4000),
+            provider_config=llm_config
+        )
+        
+        return LLMFactory.create_provider(config)
     
     def initialize_secure_file_ops(self, working_directory: Path) -> None:
         """Initialize secure file operations for the given working directory"""
@@ -224,10 +241,10 @@ class SimpleWorkMemAgent(AgentImplementation):
             context = self._retrieve_relevant_context(checkpoint)
             
             # Plan the checkpoint execution
-            plan = self._plan_checkpoint_execution(checkpoint, context)
+            plan = await self._plan_checkpoint_execution(checkpoint, context)
             
             # Execute the plan
-            success = self._execute_plan(checkpoint, plan)
+            success = await self._execute_plan(checkpoint, plan)
             
             return success
             
@@ -289,7 +306,7 @@ class SimpleWorkMemAgent(AgentImplementation):
         
         return context
     
-    def _plan_checkpoint_execution(self, checkpoint: CheckpointSpecification, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _plan_checkpoint_execution(self, checkpoint: CheckpointSpecification, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Plan the execution steps for a checkpoint"""
         # Create a prompt for the LLM to plan execution
         prompt = f"""
@@ -306,11 +323,12 @@ Context from memory:
 What steps should I take to complete this checkpoint?
 """
         
-        response = self.llm.generate_response(prompt, context)
+        response = await self.llm.generate_response(prompt, context)
+        response_content = response.content if hasattr(response, 'content') else str(response)
         # Log planning with structured plan metadata for metrics
         if self.action_tracer:
             # Include a trimmed version of the plan in metadata
-            prospective_plan = self._parse_plan_from_response(response, checkpoint)
+            prospective_plan = self._parse_plan_from_response(response_content, checkpoint)
             self.action_tracer.log_action(
                 ActionType.PLANNING,
                 success=True,
@@ -319,7 +337,7 @@ What steps should I take to complete this checkpoint?
             )
         
         # Convert LLM response to execution plan
-        plan = self._parse_plan_from_response(response, checkpoint)
+        plan = self._parse_plan_from_response(response_content, checkpoint)
         return plan
     
     def _parse_plan_from_response(self, response: str, checkpoint: CheckpointSpecification) -> List[Dict[str, Any]]:
@@ -353,16 +371,16 @@ What steps should I take to complete this checkpoint?
         
         return plan
     
-    def _execute_plan(self, checkpoint: CheckpointSpecification, plan: List[Dict[str, Any]]) -> bool:
+    async def _execute_plan(self, checkpoint: CheckpointSpecification, plan: List[Dict[str, Any]]) -> bool:
         """Execute the planned steps"""
         for step in plan:
-            success = self._execute_step(step)
+            success = await self._execute_step(step)
             if not success:
                 return False
         
         return True
     
-    def _execute_step(self, step: Dict[str, Any]) -> bool:
+    async def _execute_step(self, step: Dict[str, Any]) -> bool:
         """Execute a single step in the plan"""
         action = step.get('action')
         
@@ -374,7 +392,7 @@ What steps should I take to complete this checkpoint?
             elif action == 'edit_file':
                 return self._edit_file(step['file_path'], step.get('changes', ''))
             elif action == 'implement':
-                return self._implement_functionality(step['description'])
+                return await self._implement_functionality(step['description'])
             else:
                 self._log_action(ActionType.ERROR_ENCOUNTERED, f"Unknown action: {action}")
                 return False
@@ -501,17 +519,18 @@ What steps should I take to complete this checkpoint?
             self._log_action(ActionType.ERROR_ENCOUNTERED, f"Failed to edit file {file_path}: {e}")
             return False
     
-    def _implement_functionality(self, description: str) -> bool:
+    async def _implement_functionality(self, description: str) -> bool:
         """Implement functionality based on description"""
         try:
             # Use LLM to generate implementation
             prompt = f"Implement the following functionality: {description}"
-            response = self.llm.generate_response(prompt)
+            response = await self.llm.generate_response(prompt)
+            response_content = response.content if hasattr(response, 'content') else str(response)
             
             # Store implementation in memory
             self.memory_system.store_information(
                 f"implementation_{hash(description)}",
-                response,
+                response_content,
                 {'type': 'implementation', 'description': description, 'timestamp': time.time()}
             )
             
