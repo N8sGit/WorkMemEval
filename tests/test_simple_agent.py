@@ -18,6 +18,7 @@ from src.core.action_trace import ActionTracer, ActionType
 from src.core.task_specification import (
     TaskSpecification, CheckpointSpecification, TaskComplexityMetrics
 )
+from src.llm import MockProvider
 
 
 class TestMockLLM:
@@ -132,7 +133,7 @@ class TestSimpleWorkMemAgent:
         assert self.agent.memory_system is self.memory
         assert self.agent.max_iterations == 10
         assert self.agent.memory_context_limit == 5
-        assert isinstance(self.agent.llm, MockLLM)
+        assert isinstance(self.agent.llm, MockProvider)
     
     def test_agent_capabilities(self):
         """Test agent capabilities"""
@@ -234,7 +235,12 @@ class TestSimpleWorkMemAgent:
         )
         
         context = {'retrieved_items': []}
-        plan = self.agent._plan_checkpoint_execution(checkpoint, context)
+        
+        async def run_test():
+            plan = await self.agent._plan_checkpoint_execution(checkpoint, context)
+            return plan
+        
+        plan = asyncio.run(run_test())
         
         assert isinstance(plan, list)
         assert len(plan) > 0
@@ -267,35 +273,41 @@ class TestSimpleWorkMemAgent:
     
     def test_step_execution(self):
         """Test execution of individual plan steps"""
-        # Test read_file step
-        self.agent._create_file("test.py", "content")
-        step = {'action': 'read_file', 'file_path': 'test.py'}
-        success = self.agent._execute_step(step)
-        assert success is True
+        async def run_test():
+            # Test read_file step
+            self.agent._create_file("test.py", "content")
+            step = {'action': 'read_file', 'file_path': 'test.py'}
+            success = await self.agent._execute_step(step)
+            assert success is True
+            
+            # Test create_file step
+            step = {'action': 'create_file', 'file_path': 'new.py', 'content': 'new content'}
+            success = await self.agent._execute_step(step)
+            assert success is True
+            
+            # Test implement step
+            step = {'action': 'implement', 'description': 'calculator functions'}
+            success = await self.agent._execute_step(step)
+            assert success is True
+            
+            # Test unknown action
+            step = {'action': 'unknown_action'}
+            success = await self.agent._execute_step(step)
+            assert success is False
         
-        # Test create_file step
-        step = {'action': 'create_file', 'file_path': 'new.py', 'content': 'new content'}
-        success = self.agent._execute_step(step)
-        assert success is True
-        
-        # Test implement step
-        step = {'action': 'implement', 'description': 'calculator functions'}
-        success = self.agent._execute_step(step)
-        assert success is True
-        
-        # Test unknown action
-        step = {'action': 'unknown_action'}
-        success = self.agent._execute_step(step)
-        assert success is False
+        asyncio.run(run_test())
     
     def test_implementation_functionality(self):
         """Test implementation of functionality"""
-        success = self.agent._implement_functionality("create calculator functions")
-        assert success is True
+        async def run_test():
+            success = await self.agent._implement_functionality("create calculator functions")
+            assert success is True
+            
+            # Should store implementation in memory
+            results = self.memory.retrieve_information("calculator", {})
+            assert len(results) > 0
         
-        # Should store implementation in memory
-        results = self.memory.retrieve_information("calculator", {})
-        assert len(results) > 0
+        asyncio.run(run_test())
     
     def test_context_formatting(self):
         """Test formatting of context for prompts"""
@@ -352,16 +364,19 @@ class TestSimpleWorkMemAgent:
     
     def test_error_handling(self):
         """Test error handling in various operations"""
-        # Test with a mock that raises an exception
-        original_llm = self.agent.llm
-        self.agent.llm = Mock()
-        self.agent.llm.generate_response.side_effect = Exception("Mock error")
+        async def run_test():
+            # Test with a mock that raises an exception
+            original_llm = self.agent.llm
+            self.agent.llm = Mock()
+            self.agent.llm.generate_response.side_effect = Exception("Mock error")
+            
+            success = await self.agent._implement_functionality("test")
+            assert success is False
+            
+            # Restore original LLM
+            self.agent.llm = original_llm
         
-        success = self.agent._implement_functionality("test")
-        assert success is False
-        
-        # Restore original LLM
-        self.agent.llm = original_llm
+        asyncio.run(run_test())
     
     def test_action_logging(self):
         """Test that actions are logged correctly"""
@@ -381,9 +396,12 @@ class TestSimpleWorkMemAgent:
         no_memory = NoMemory({})
         no_mem_agent = SimpleWorkMemAgent(no_memory, {})
         
-        # Should still work, just no memory persistence
-        success = no_mem_agent._implement_functionality("test")
-        assert success is True
+        async def run_test():
+            # Should still work, just no memory persistence
+            success = await no_mem_agent._implement_functionality("test")
+            assert success is True
+        
+        asyncio.run(run_test())
         
         # NoMemory should show empty retrieval
         context = no_mem_agent._retrieve_relevant_context(
@@ -394,7 +412,8 @@ class TestSimpleWorkMemAgent:
                 stub_file="test.py",
                 stub_function="test",
                 requirements="test requirements",
-                test_file="test_test.py"
+                test_file="test_test.py",
+                dependencies=[]
             )
         )
         assert len(context['retrieved_items']) == 0
@@ -460,21 +479,27 @@ class TestAgentMemoryInteraction:
         memory = SimpleContextMemory({'max_items': 10})
         agent = SimpleWorkMemAgent(memory, {})
         
-        # Store and retrieve information
-        agent._implement_functionality("calculator add function")
+        async def run_test():
+            # Store and retrieve information
+            await agent._implement_functionality("calculator add function")
+            
+            # Should be able to find the implementation
+            results = memory.retrieve_information("calculator", {})
+            assert len(results) > 0
         
-        # Should be able to find the implementation
-        results = memory.retrieve_information("calculator", {})
-        assert len(results) > 0
+        asyncio.run(run_test())
     
     def test_with_no_memory(self):
         """Test agent with NoMemory system"""
         memory = NoMemory({})
         agent = SimpleWorkMemAgent(memory, {})
         
-        # Should work without errors even with no memory
-        success = agent._implement_functionality("test function")
-        assert success is True
+        async def run_test():
+            # Should work without errors even with no memory
+            success = await agent._implement_functionality("test function")
+            assert success is True
+        
+        asyncio.run(run_test())
         
         # But memory won't retrieve anything
         context = agent._retrieve_relevant_context(

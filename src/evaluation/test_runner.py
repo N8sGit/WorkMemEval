@@ -33,16 +33,23 @@ class TestRunner:
         cwd = Path(cwd)
         test_path = Path(test_file)
 
-        # Resolve test path relative to cwd if not absolute
-        if not test_path.is_absolute():
-            test_path = cwd / test_path
-
+        # Always use relative test path from the working directory
+        if test_path.is_absolute():
+            # Make it relative to cwd if it's absolute
+            try:
+                test_path = test_path.relative_to(cwd)
+            except ValueError:
+                # If we can't make it relative, keep it absolute
+                pass
+        
         cmd = ["pytest", "-q", str(test_path)]
         start = time.time()
         try:
             env = os.environ.copy()
-            # Ensure Python can import local src when running inside working directory
-            env["PYTHONPATH"] = f"{cwd}:{env.get('PYTHONPATH','')}" if env.get("PYTHONPATH") else str(cwd)
+            # Ensure Python can import local modules from the working directory
+            # Since we're running with cwd=working_directory, PYTHONPATH should be "."
+            current_pythonpath = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = f".:{current_pythonpath}" if current_pythonpath else "."
 
             proc = subprocess.run(
                 cmd,
