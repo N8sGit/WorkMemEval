@@ -1,8 +1,8 @@
 """
 WorkMemEval: Simple Agent Implementation
 
-A baseline agent implementation using mock components for deterministic testing
-and evaluation of memory systems without external dependencies.
+A baseline agent implementation for WorkMemEval that integrates with 
+various LLM providers and memory systems for agent evaluation.
 """
 
 import asyncio
@@ -16,126 +16,33 @@ from ..core.plugin_interfaces import AgentImplementation, MemorySystem, PluginCa
 from ..core.action_trace import ActionTracer, ActionType, TaskTrace, CheckpointTrace
 from ..core.task_specification import TaskSpecification, CheckpointSpecification
 from ..core.llm_interfaces import LLMConfig, LLMProvider
-from ..llm import LLMFactory
+from ..llm import LLMFactory, UnsupportedProviderError
 from .secure_file_ops import SecureFileOperations, SecurityViolationError
 
-
-class MockLLM:
-    """
-    Mock LLM for deterministic testing and development.
-    
-    Returns pattern-based responses without external API calls.
-    """
-    
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.response_delay = config.get('response_delay', 0.1)  # Simulate thinking time
-        self.call_count = 0
-        
-    def generate_response(self, prompt: str, context: Dict[str, Any] = None) -> str:
-        """Generate a deterministic response based on prompt patterns"""
-        self.call_count += 1
-        
-        # Simulate processing time
-        if self.response_delay > 0:
-            time.sleep(self.response_delay)
-        
-        prompt_lower = prompt.lower()
-        
-        # File operation patterns
-        if "read file" in prompt_lower or "show me the contents" in prompt_lower:
-            if "requirements" in prompt_lower or "spec" in prompt_lower:
-                return "I need to read the file to understand the requirements. Let me do that now."
-            return "I'll read the file to see its current contents."
-        
-        if "write file" in prompt_lower or "create file" in prompt_lower:
-            return "I'll create the file with the appropriate content."
-        
-        if "edit file" in prompt_lower or "modify file" in prompt_lower:
-            return "I'll make the necessary changes to the file."
-        
-        # Implementation patterns
-        if "implement" in prompt_lower and "function" in prompt_lower:
-            return self._generate_function_implementation(prompt)
-        
-        if "implement" in prompt_lower and "class" in prompt_lower:
-            return self._generate_class_implementation(prompt)
-        
-        # Testing patterns
-        if "test" in prompt_lower and ("write" in prompt_lower or "create" in prompt_lower):
-            return "I'll create comprehensive tests for this functionality."
-        
-        # Analysis patterns
-        if "analyze" in prompt_lower or "understand" in prompt_lower:
-            return "Let me analyze the code and requirements to understand what needs to be done."
-        
-        # Planning patterns
-        if "plan" in prompt_lower or "approach" in prompt_lower:
-            return ("I'll break this down into steps:\n"
-                   "1. Read and understand the requirements\n" 
-                   "2. Analyze existing code\n"
-                   "3. Implement the necessary changes\n"
-                   "4. Test the implementation")
-        
-        # Error handling patterns
-        if "error" in prompt_lower or "debug" in prompt_lower:
-            return "I'll examine the error and fix the issue."
-        
-        # Default response
-        return ("I understand the task. Let me proceed step by step to complete it effectively.")
-    
-    def _generate_function_implementation(self, prompt: str) -> str:
-        """Generate a basic function implementation"""
-        if "calculator" in prompt.lower():
-            return '''def add(a, b):
-    """Add two numbers"""
-    return a + b
-
-def multiply(a, b):
-    """Multiply two numbers"""
-    return a * b'''
-        
-        if "fibonacci" in prompt.lower():
-            return '''def fibonacci(n):
-    """Generate fibonacci sequence up to n"""
-    if n <= 0:
-        return []
-    elif n == 1:
-        return [0]
-    elif n == 2:
-        return [0, 1]
-    
-    fib = [0, 1]
-    for i in range(2, n):
-        fib.append(fib[i-1] + fib[i-2])
-    return fib'''
-        
-        return '''def example_function(param):
-    """Example function implementation"""
-    # TODO: Implement functionality
-    return param'''
-    
-    def _generate_class_implementation(self, prompt: str) -> str:
-        """Generate a basic class implementation"""
-        return '''class ExampleClass:
-    """Example class implementation"""
-    
-    def __init__(self, value=None):
-        self.value = value
-    
-    def get_value(self):
-        return self.value
-    
-    def set_value(self, value):
-        self.value = value'''
+# Import test mock provider if available
+try:
+    from ..tests.mock_llm_provider import MockLLMProvider
+except ImportError:
+    try:
+        import sys
+        from pathlib import Path
+        # Adjust path for tests directory when running unit tests
+        tests_dir = Path(__file__).parent.parent.parent / 'tests'
+        if tests_dir.exists():
+            sys.path.insert(0, str(tests_dir.parent))
+            from tests.mock_llm_provider import MockLLMProvider
+        else:
+            MockLLMProvider = None
+    except ImportError:
+        MockLLMProvider = None
 
 
 class SimpleWorkMemAgent(AgentImplementation):
     """
-    Simple baseline agent for WorkMemEval testing.
+    Simple baseline agent for WorkMemEval evaluation.
     
-    Uses mock components for deterministic behavior and focuses on
-    memory system integration and action tracing.
+    Integrates with LLM providers and memory systems to perform
+    memory-guided task execution and behavioral tracing.
     """
     
     def __init__(self, memory_system: MemorySystem, config: Dict[str, Any]):
@@ -168,14 +75,28 @@ class SimpleWorkMemAgent(AgentImplementation):
         model = llm_config.get('model', 'test-model')
         
         config = LLMConfig(
-            provider=LLMProvider(provider),
+            provider=LLMProvider(provider) if provider != 'mock' else 'mock',
             model=model,
             temperature=llm_config.get('temperature', 0.1),
             max_tokens=llm_config.get('max_tokens', 4000),
             provider_config=llm_config
         )
         
-        return LLMFactory.create_provider(config)
+        try:
+            return LLMFactory.create_provider(config)
+        except (UnsupportedProviderError, ValueError) as e:
+            # Fallback to mock provider for testing
+            if provider == 'mock' and MockLLMProvider is not None:
+                mock_config = LLMConfig(
+                    provider='mock',  # Use string for mock
+                    model=model,
+                    temperature=llm_config.get('temperature', 0.1),
+                    max_tokens=llm_config.get('max_tokens', 4000),
+                    provider_config=llm_config
+                )
+                return MockLLMProvider(mock_config)
+            else:
+                raise e
     
     def initialize_secure_file_ops(self, working_directory: Path) -> None:
         """Initialize secure file operations for the given working directory"""
@@ -558,7 +479,7 @@ What steps should I take to complete this checkpoint?
                 current_content = ''
             
             # Simple implementation replacement logic - always apply the fallback implementations
-            # since MockProvider might not generate syntactically correct Python
+            # since mock providers might not generate syntactically correct Python
             new_content = current_content
             
             # If it's an add function implementation

@@ -1,5 +1,5 @@
 """
-Unit tests for SimpleWorkMemAgent and MockLLM.
+Unit tests for SimpleWorkMemAgent.
 
 Tests the baseline agent implementation with comprehensive
 coverage following TDD principles.
@@ -10,7 +10,7 @@ import time
 import asyncio
 from unittest.mock import Mock, MagicMock
 
-from src.agents.simple_agent import SimpleWorkMemAgent, MockLLM
+from src.agents.simple_agent import SimpleWorkMemAgent
 from src.memory.reference_implementations import SimpleContextMemory
 from src.memory.memory_system import NoMemoryBaseline as NoMemory
 from src.core.plugin_interfaces import PluginCapabilities
@@ -18,101 +18,8 @@ from src.core.action_trace import ActionTracer, ActionType
 from src.core.task_specification import (
     TaskSpecification, CheckpointSpecification, TaskComplexityMetrics
 )
-from src.llm import MockProvider
-
-
-class TestMockLLM:
-    """Test MockLLM functionality"""
-    
-    def setup_method(self):
-        """Setup for each test"""
-        self.llm = MockLLM({'response_delay': 0.0})  # No delay for tests
-    
-    def test_mock_llm_creation(self):
-        """Test creating MockLLM"""
-        assert isinstance(self.llm, MockLLM)
-        assert self.llm.call_count == 0
-        assert self.llm.response_delay == 0.0
-    
-    def test_mock_llm_with_config(self):
-        """Test MockLLM with configuration"""
-        config_llm = MockLLM({
-            'response_delay': 0.5,
-            'model': 'mock-gpt'
-        })
-        assert config_llm.response_delay == 0.5
-        assert config_llm.config['model'] == 'mock-gpt'
-    
-    def test_file_operation_responses(self):
-        """Test LLM responses for file operations"""
-        # Read file responses
-        response = self.llm.generate_response("read file example.py")
-        assert "read the file" in response.lower()
-        assert self.llm.call_count == 1
-        
-        # Write file responses
-        response = self.llm.generate_response("write file output.txt")
-        assert "create the file" in response.lower()
-        assert self.llm.call_count == 2
-        
-        # Edit file responses
-        response = self.llm.generate_response("edit file config.json")
-        assert "make the necessary changes" in response.lower()
-        assert self.llm.call_count == 3
-    
-    def test_implementation_responses(self):
-        """Test LLM responses for implementation tasks"""
-        # Function implementation
-        response = self.llm.generate_response("implement function calculator add")
-        assert "def add" in response
-        assert "return a + b" in response
-        
-        # Class implementation
-        response = self.llm.generate_response("implement class DataProcessor")
-        assert "class ExampleClass" in response
-        assert "def __init__" in response
-    
-    def test_calculator_specific_implementation(self):
-        """Test calculator-specific implementation"""
-        response = self.llm.generate_response("implement calculator functions")
-        assert "def add" in response
-        assert "def multiply" in response
-        assert "return a + b" in response
-        assert "return a * b" in response
-    
-    def test_fibonacci_implementation(self):
-        """Test fibonacci-specific implementation"""
-        response = self.llm.generate_response("implement fibonacci function")
-        assert "def fibonacci" in response
-        assert "fib = [0, 1]" in response
-        assert "fib.append" in response
-    
-    def test_planning_responses(self):
-        """Test planning and analysis responses"""
-        response = self.llm.generate_response("plan the implementation approach")
-        assert "step" in response.lower()
-        assert "1." in response
-        assert "requirements" in response.lower()
-        
-        response = self.llm.generate_response("analyze the code structure")
-        assert "analyze" in response.lower()
-        assert "understand" in response.lower()
-    
-    def test_default_response(self):
-        """Test default response for unmatched patterns"""
-        response = self.llm.generate_response("random unmatched query")
-        assert "understand the task" in response.lower()
-        assert "step by step" in response.lower()
-    
-    def test_call_count_tracking(self):
-        """Test that call count is tracked correctly"""
-        initial_count = self.llm.call_count
-        
-        self.llm.generate_response("test query 1")
-        assert self.llm.call_count == initial_count + 1
-        
-        self.llm.generate_response("test query 2")
-        assert self.llm.call_count == initial_count + 2
+from src.core.llm_interfaces import LLMConfig, LLMProvider
+from .mock_llm_provider import MockLLMProvider
 
 
 class TestSimpleWorkMemAgent:
@@ -133,7 +40,7 @@ class TestSimpleWorkMemAgent:
         assert self.agent.memory_system is self.memory
         assert self.agent.max_iterations == 10
         assert self.agent.memory_context_limit == 5
-        assert isinstance(self.agent.llm, MockProvider)
+        assert isinstance(self.agent.llm, MockLLMProvider)
     
     def test_agent_capabilities(self):
         """Test agent capabilities"""

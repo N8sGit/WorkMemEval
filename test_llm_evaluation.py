@@ -40,7 +40,7 @@ async def run_llm_evaluation(use_real_llm: bool = False):
             'max_tokens': 4000
         }
     else:
-        print("🎭 Using MockProvider (no API key required)")
+        print("🎭 Using mock test provider (no API key required)")
         llm_config = {
             'provider': 'mock',
             'model': 'test-calculator-model',
@@ -248,7 +248,7 @@ async def main():
         print("🔑 OpenRouter API key detected - can run with real LLM")
         use_real_llm = True
     else:
-        print("🎭 No API keys detected - will use MockProvider")
+        print("🎭 No API keys detected - will use mock test provider")
         use_real_llm = False
     
     print()

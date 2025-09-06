@@ -16,7 +16,6 @@ class LLMProvider(Enum):
     """Supported LLM providers"""
     OPENAI = "openai"
     OPENROUTER = "openrouter"
-    MOCK = "mock"
 
 
 @dataclass
