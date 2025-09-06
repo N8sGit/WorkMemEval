@@ -1,4 +1,4 @@
-# Simple Calculator - Agent Implementation Required
+# Calculator Demo - Agent Implementation Required
 #
 # This file contains stubs that need to be implemented by the agent.
 # The agent should implement the functions according to the requirements.

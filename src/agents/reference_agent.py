@@ -1,7 +1,7 @@
 """
-WorkMemEval: Simple Agent Implementation
+WorkMemEval: Reference Agent Implementation
 
-A baseline agent implementation for WorkMemEval that integrates with 
+A reference agent implementation for WorkMemEval that integrates with 
 various LLM providers and memory systems for agent evaluation.
 """
 
@@ -37,9 +37,9 @@ except ImportError:
         MockLLMProvider = None
 
 
-class SimpleWorkMemAgent(AgentImplementation):
+class ReferenceWorkMemAgent(AgentImplementation):
     """
-    Simple baseline agent for WorkMemEval evaluation.
+    Reference agent implementation for WorkMemEval evaluation.
     
     Integrates with LLM providers and memory systems to perform
     memory-guided task execution and behavioral tracing.

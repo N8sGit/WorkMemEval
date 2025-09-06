@@ -1,8 +1,8 @@
 {
-  "task_id": "simple_calculator",
-  "title": "Simple Calculator Implementation",
-  "domain": "programming",
-  "description": "Implement a basic calculator with addition and multiplication functions, then create a simple API wrapper.",
+  "task_id": "calculator_demo",
+  "title": "Calculator Demo Implementation",
+  "domain": "calculator",
+  "description": "Implement a calculator with basic arithmetic operations for demonstration",
   "planning_phase": {
     "overview_prompt": "Outline how you will implement add, multiply, and a Calculator class, step by step.",
     "planning_deliverables": {},
@@ -11,7 +11,7 @@
     "required_sections": []
   },
   "repository": {
-    "template_name": "simple_calculator",
+    "template_name": "calculator_demo",
     "provided_files": ["calculator.py"],
     "distractor_files": [],
     "directory_structure": {"tests": ["test_calculator_cp1.py", "test_calculator_cp2.py", "test_calculator_cp3.py"]},

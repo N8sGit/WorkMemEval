@@ -4,6 +4,6 @@ WorkMemEval: Agent Implementations
 This module contains agent implementations for the WorkMemEval framework.
 """
 
-from .simple_agent import SimpleWorkMemAgent
+from .reference_agent import ReferenceWorkMemAgent
 
-__all__ = ['SimpleWorkMemAgent']
+__all__ = ['ReferenceWorkMemAgent']

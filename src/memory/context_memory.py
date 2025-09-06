@@ -1,14 +1,14 @@
 """
-WorkMemEval: Simple Memory Systems
+WorkMemEval: Context Memory Systems
 
-Baseline memory system implementations for comparison and testing.
+Context-based memory system implementations for comparison and testing.
 These provide reference implementations of the MemorySystem interface
 with different memory management strategies.
 """
 
 import time
 from typing import Dict, Any, List
-from ..core.plugin_interfaces import MemorySystem, PluginCapabilities
+from .memory_system import MemorySystem, PluginCapabilities
 
 
 class NoMemory(MemorySystem):
@@ -73,12 +73,12 @@ class NoMemory(MemorySystem):
         }
 
 
-class SimpleContextMemory(MemorySystem):
+class ContextMemorySystem(MemorySystem):
     """
-    Simple context-based memory system.
+    Context-based memory system.
     
-    Uses basic list-based storage with naive keyword matching for retrieval.
-    This represents the simplest possible memory system beyond no memory.
+    Uses list-based storage with keyword matching for retrieval.
+    Provides a practical baseline for memory-guided agent evaluation.
     """
     
     def __init__(self, config: Dict[str, Any]):

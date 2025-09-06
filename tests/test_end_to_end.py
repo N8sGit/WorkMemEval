@@ -14,8 +14,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.evaluation.runner import BasicWorkMemEvalRunner
-from src.agents.simple_agent import SimpleWorkMemAgent
-from src.memory.reference_implementations import SimpleContextMemory
+from src.agents.reference_agent import ReferenceWorkMemAgent
+from src.memory.context_memory import ContextMemorySystem
 from src.memory.memory_system import NoMemoryBaseline as NoMemory
 from src.evaluation.results import ComparisonResult
 
@@ -25,8 +25,8 @@ async def test_basic_evaluation():
     print("=== Basic Evaluation Test ===")
     
     # Set up components
-    memory_system = SimpleContextMemory({'max_items': 100})
-    agent = SimpleWorkMemAgent(memory_system, {
+    memory_system = ContextMemorySystem({'max_items': 100})
+    agent = ReferenceWorkMemAgent(memory_system, {
         'max_iterations': 10,
         'memory_context_limit': 5,
         'llm_config': {'response_delay': 0.1}  # Slight delay for realism
@@ -34,7 +34,7 @@ async def test_basic_evaluation():
     
     # Set up evaluation
     runner = BasicWorkMemEvalRunner()
-    task_path = Path("tasks/simple_calculator.json")
+    task_path = Path("tasks/calculator_demo.json")
     
     try:
         # Run evaluation
@@ -57,14 +57,14 @@ async def test_memory_system_comparison():
     print("\n\n=== Memory System Comparison Test ===")
     
     runner = BasicWorkMemEvalRunner()
-    task_path = Path("tasks/simple_calculator.json")
+    task_path = Path("tasks/calculator_demo.json")
     comparison = ComparisonResult("Memory System Comparison")
     
     # Test with different memory systems
     memory_systems = [
         ("NoMemory", NoMemory({})),
-        ("SimpleContextMemory", SimpleContextMemory({'max_items': 50})),
-        ("SimpleContextMemory_Large", SimpleContextMemory({'max_items': 200}))
+        ("ContextMemorySystem", ContextMemorySystem({'max_items': 50})),
+        ("ContextMemorySystem_Large", ContextMemorySystem({'max_items': 200}))
     ]
     
     for memory_name, memory_system in memory_systems:
@@ -72,7 +72,7 @@ async def test_memory_system_comparison():
         
         try:
             # Create agent with this memory system
-            agent = SimpleWorkMemAgent(memory_system, {
+            agent = ReferenceWorkMemAgent(memory_system, {
                 'max_iterations': 10,
                 'memory_context_limit': 5,
                 'llm_config': {'response_delay': 0.05}
@@ -99,7 +99,7 @@ async def test_task_loading():
     print("\n\n=== Task Loading Test ===")
     
     runner = BasicWorkMemEvalRunner()
-    task_path = Path("tasks/simple_calculator.json")
+    task_path = Path("tasks/calculator_demo.json")
     
     try:
         # Load task

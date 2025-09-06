@@ -13,8 +13,8 @@ from pathlib import Path
 from unittest.mock import Mock, AsyncMock, patch
 
 from src.evaluation.runner import BasicWorkMemEvalRunner
-from src.agents.simple_agent import SimpleWorkMemAgent
-from src.memory.simple_memory import SimpleContextMemory
+from src.agents.reference_agent import ReferenceWorkMemAgent
+from src.memory.context_memory import ContextMemorySystem
 from src.core.task_specification import TaskSpecification, CheckpointSpecification
 from src.core.action_trace import ActionType
 
@@ -67,8 +67,8 @@ class TestRunnerOrchestration:
     @pytest.fixture
     def agent_and_memory(self):
         """Create agent and memory system"""
-        memory = SimpleContextMemory({'max_items': 10})
-        agent = SimpleWorkMemAgent(memory, {
+        memory = ContextMemorySystem({'max_items': 50})
+        agent = ReferenceWorkMemAgent(memory, {
             'max_iterations': 5,
             'memory_context_limit': 3,
             'llm_config': {'response_delay': 0.01}

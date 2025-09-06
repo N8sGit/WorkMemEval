@@ -18,6 +18,11 @@ from .reference_implementations import (
     SimpleContextMemory
 )
 
+from .context_memory import (
+    NoMemory,
+    ContextMemorySystem
+)
+
 __all__ = [
     'PluginCapabilities',
     'MemorySystem',
@@ -26,5 +31,7 @@ __all__ = [
     'MemorySystemFactory',
     'MemorySystemError',
     'ExampleKeyValueMemory',
-    'SimpleContextMemory'
+    'SimpleContextMemory',
+    'NoMemory',
+    'ContextMemorySystem'
 ]

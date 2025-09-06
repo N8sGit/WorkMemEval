@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Dict, Any
 
 from src.evaluation.runner import BasicWorkMemEvalRunner, TaskSpecificationLoader
-from src.agents.simple_agent import SimpleWorkMemAgent
-from src.memory.simple_memory import SimpleContextMemory
+from src.agents.reference_agent import ReferenceWorkMemAgent
+from src.memory.context_memory import ContextMemorySystem
 from src.core.action_trace import ActionTracer
 
 
@@ -26,7 +26,7 @@ async def run_llm_evaluation(use_real_llm: bool = False):
     print("=" * 50)
     
     # Configuration
-    task_file = Path("tasks/simple_calculator.json")
+    task_file = Path("tasks/calculator_demo.json")
     workspace_dir = Path("evaluation_workspace/llm_test")
     workspace_dir.mkdir(parents=True, exist_ok=True)
     
@@ -53,7 +53,7 @@ async def run_llm_evaluation(use_real_llm: bool = False):
         'max_memory_size': 50000,
         'relevance_threshold': 0.1
     }
-    memory_system = SimpleContextMemory(memory_config)
+    memory_system = ContextMemorySystem(memory_config)
     
     # Create agent with LLM integration
     agent_config = {
@@ -63,7 +63,7 @@ async def run_llm_evaluation(use_real_llm: bool = False):
         'working_directory': str(workspace_dir),
         'llm_config': llm_config
     }
-    agent = SimpleWorkMemAgent(memory_system, agent_config)
+    agent = ReferenceWorkMemAgent(memory_system, agent_config)
     
     print(f"💭 Agent LLM: {type(agent.llm).__name__}")
     print(f"🧠 Memory System: {type(memory_system).__name__}")

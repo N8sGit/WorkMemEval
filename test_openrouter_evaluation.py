@@ -15,8 +15,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.llm import LLMFactory, LLMConfig, LLMProvider, resolve_model_name
-from src.agents.simple_agent import SimpleWorkMemAgent
-from src.memory.reference_implementations import SimpleContextMemory
+from src.agents.reference_agent import ReferenceWorkMemAgent
+from src.memory.context_memory import ContextMemorySystem
 from src.evaluation.runner import BasicWorkMemEvalRunner, TaskSpecificationLoader
 from src.core.action_trace import ActionTracer
 
@@ -120,7 +120,7 @@ async def test_openrouter_simple_generation():
 
 
 async def test_openrouter_agent_integration():
-    """Test OpenRouter integration with SimpleWorkMemAgent"""
+    """Test OpenRouter integration with ReferenceWorkMemAgent"""
     print_header("OpenRouter Agent Integration Test", "🤖")
     
     # Determine which provider to use
@@ -141,14 +141,14 @@ async def test_openrouter_agent_integration():
         }
     
     # Create agent with OpenRouter or fallback
-    memory = SimpleContextMemory({'max_items': 100})
+    memory = ContextMemorySystem({'max_items': 100})
     agent_config = {
         'max_iterations': 10,
         'memory_context_limit': 5,
         'llm_config': llm_config
     }
     
-    agent = SimpleWorkMemAgent(memory, agent_config)
+    agent = ReferenceWorkMemAgent(memory, agent_config)
     
     print(f"✅ Agent created with LLM provider: {type(agent.llm).__name__}")
     print(f"   Model: {agent.llm.config.model}")
@@ -197,7 +197,7 @@ async def test_full_evaluation_with_openrouter():
         provider_name = "Mock Test Provider"
     
     # Create evaluation components
-    memory = SimpleContextMemory({'max_items': 100})
+    memory = ContextMemorySystem({'max_items': 100})
     agent_config = {
         'max_iterations': 10,
         'memory_context_limit': 5,
@@ -205,13 +205,13 @@ async def test_full_evaluation_with_openrouter():
         'use_secure_file_ops': True
     }
     
-    agent = SimpleWorkMemAgent(memory, agent_config)
+    agent = ReferenceWorkMemAgent(memory, agent_config)
     action_tracer = ActionTracer(task_id="openrouter_test")
     runner = BasicWorkMemEvalRunner()
     
     # Load task
     loader = TaskSpecificationLoader()
-    task_spec = loader.load_task(Path('tasks/simple_calculator.json'))
+    task_spec = loader.load_task(Path('tasks/calculator_demo.json'))
     
     print(f"📋 Task: {task_spec.title}")
     print(f"🎯 Checkpoints: {len(task_spec.checkpoints)}")
@@ -224,7 +224,7 @@ async def test_full_evaluation_with_openrouter():
         # Run evaluation using correct method signature
         working_directory = Path("evaluation_workspace/openrouter_test")
         result = await runner.run_evaluation(
-            task_path=Path('tasks/simple_calculator.json'),
+            task_path=Path('tasks/calculator_demo.json'),
             agent=agent,
             memory_system=memory,
             working_directory=working_directory

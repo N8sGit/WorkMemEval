@@ -9,7 +9,7 @@ import pytest
 import time
 from src.memory.reference_implementations import SimpleContextMemory
 from src.memory.memory_system import NoMemoryBaseline as NoMemory, PluginCapabilities
-from src.memory.simple_memory import CompressedMemory
+from src.memory.context_memory import CompressedMemory
 
 
 class TestNoMemory:

@@ -1,7 +1,7 @@
 """
-Unit tests for SimpleWorkMemAgent.
+Unit tests for ReferenceWorkMemAgent.
 
-Tests the baseline agent implementation with comprehensive
+Tests the reference agent implementation with comprehensive
 coverage following TDD principles.
 """
 
@@ -10,8 +10,8 @@ import time
 import asyncio
 from unittest.mock import Mock, MagicMock
 
-from src.agents.simple_agent import SimpleWorkMemAgent
-from src.memory.reference_implementations import SimpleContextMemory
+from src.agents.reference_agent import ReferenceWorkMemAgent
+from src.memory.context_memory import ContextMemorySystem
 from src.memory.memory_system import NoMemoryBaseline as NoMemory
 from src.core.plugin_interfaces import PluginCapabilities
 from src.core.action_trace import ActionTracer, ActionType
@@ -22,21 +22,21 @@ from src.core.llm_interfaces import LLMConfig, LLMProvider
 from .mock_llm_provider import MockLLMProvider
 
 
-class TestSimpleWorkMemAgent:
-    """Test SimpleWorkMemAgent functionality"""
+class TestReferenceWorkMemAgent:
+    """Test ReferenceWorkMemAgent functionality"""
     
     def setup_method(self):
         """Setup for each test"""
-        self.memory = SimpleContextMemory({'max_items': 100})
-        self.agent = SimpleWorkMemAgent(self.memory, {
+        self.memory = ContextMemorySystem({'max_items': 100})
+        self.agent = ReferenceWorkMemAgent(self.memory, {
             'max_iterations': 10,
             'memory_context_limit': 5,
             'llm_config': {'response_delay': 0.0}
         })
     
     def test_agent_creation(self):
-        """Test creating SimpleWorkMemAgent"""
-        assert isinstance(self.agent, SimpleWorkMemAgent)
+        """Test creating ReferenceWorkMemAgent"""
+        assert isinstance(self.agent, ReferenceWorkMemAgent)
         assert self.agent.memory_system is self.memory
         assert self.agent.max_iterations == 10
         assert self.agent.memory_context_limit == 5
@@ -301,7 +301,7 @@ class TestSimpleWorkMemAgent:
         """Test integration with different memory systems"""
         # Test with NoMemory
         no_memory = NoMemory({})
-        no_mem_agent = SimpleWorkMemAgent(no_memory, {})
+        no_mem_agent = ReferenceWorkMemAgent(no_memory, {})
         
         async def run_test():
             # Should still work, just no memory persistence
@@ -382,9 +382,9 @@ class TestAgentMemoryInteraction:
     """Test agent interaction with different memory systems"""
     
     def test_with_simple_memory(self):
-        """Test agent with SimpleContextMemory"""
-        memory = SimpleContextMemory({'max_items': 10})
-        agent = SimpleWorkMemAgent(memory, {})
+        """Test agent with ContextMemorySystem"""
+        memory = ContextMemorySystem({'max_items': 10})
+        agent = ReferenceWorkMemAgent(memory, {})
         
         async def run_test():
             # Store and retrieve information
@@ -399,7 +399,7 @@ class TestAgentMemoryInteraction:
     def test_with_no_memory(self):
         """Test agent with NoMemory system"""
         memory = NoMemory({})
-        agent = SimpleWorkMemAgent(memory, {})
+        agent = ReferenceWorkMemAgent(memory, {})
         
         async def run_test():
             # Should work without errors even with no memory
@@ -424,8 +424,8 @@ class TestAgentMemoryInteraction:
     
     def test_memory_context_limiting(self):
         """Test that memory context is properly limited"""
-        memory = SimpleContextMemory({'max_items': 100})
-        agent = SimpleWorkMemAgent(memory, {'memory_context_limit': 2})
+        memory = ContextMemorySystem({'max_items': 100})
+        agent = ReferenceWorkMemAgent(memory, {'memory_context_limit': 2})
         
         # Store multiple items
         for i in range(5):

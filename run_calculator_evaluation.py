@@ -14,8 +14,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.evaluation.runner import BasicWorkMemEvalRunner, TaskSpecificationLoader
-from src.agents.simple_agent import SimpleWorkMemAgent
-from src.memory.reference_implementations import SimpleContextMemory
+from src.agents.reference_agent import ReferenceWorkMemAgent
+from src.memory.context_memory import ContextMemorySystem
 from src.core.action_trace import ActionTracer
 import os
 
@@ -54,7 +54,7 @@ async def main():
     print("\n⚙️ Setting up evaluation components...")
     
     # Memory system
-    memory = SimpleContextMemory({'max_items': 100})
+    memory = ContextMemorySystem({'max_items': 100})
     print(f"✅ Memory system: {memory.__class__.__name__}")
     
     # Agent configuration
@@ -66,7 +66,7 @@ async def main():
     }
     
     # Create agent
-    agent = SimpleWorkMemAgent(memory, agent_config)
+    agent = ReferenceWorkMemAgent(memory, agent_config)
     print(f"✅ Agent: {agent.__class__.__name__}")
     print(f"   LLM: {agent.llm.__class__.__name__}")
     print(f"   Model: {agent.llm.config.model}")
@@ -81,7 +81,7 @@ async def main():
     
     try:
         result = await runner.run_evaluation(
-            task_path=Path('tasks/simple_calculator.json'),
+            task_path=Path('tasks/calculator_demo.json'),
             agent=agent,
             memory_system=memory,
             working_directory=Path("evaluation_workspace/direct_test")

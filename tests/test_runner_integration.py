@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 from src.evaluation.runner import BasicWorkMemEvalRunner
-from src.agents.simple_agent import SimpleWorkMemAgent
-from src.memory.simple_memory import SimpleContextMemory
+from src.agents.reference_agent import ReferenceWorkMemAgent
+from src.memory.context_memory import ContextMemorySystem
 from src.core.task_specification import TaskSpecification, CheckpointSpecification
 from src.core.action_trace import ActionType
 
@@ -52,8 +52,8 @@ async def test_runner_logs_test_execution(tmp_path: Path):
     )
 
     runner = BasicWorkMemEvalRunner()
-    memory = SimpleContextMemory({'max_items': 10})
-    agent = SimpleWorkMemAgent(memory, {'llm_config': {'response_delay': 0}})
+    memory = ContextMemorySystem({'max_items': 100})
+    agent = ReferenceWorkMemAgent(memory, {'max_iterations': 10})
 
     # Patch the loader to return our synthetic task
     from unittest.mock import patch
