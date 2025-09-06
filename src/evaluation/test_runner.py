@@ -22,7 +22,7 @@ class TestRunResult:
     errors: List[str]
 
 
-class TestRunner:
+class PytestRunner:
     def __init__(self, tail_chars: int = 2000):
         self.tail_chars = tail_chars
 

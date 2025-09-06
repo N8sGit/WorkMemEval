@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from src.evaluation.test_runner import TestRunner
+from src.evaluation.test_runner import PytestRunner
 
 
-class TestTestRunner:
+class TestPytestRunner:
     def test_passing_test_file(self, tmp_path: Path):
         # Create a simple passing pytest file
         test_file = tmp_path / "test_ok.py"
@@ -25,7 +25,7 @@ class TestTestRunner:
             )
         )
 
-        runner = TestRunner()
+        runner = PytestRunner()
         result = runner.run(str(test_file.name), cwd=tmp_path)
 
         assert result.passed is True
@@ -46,7 +46,7 @@ class TestTestRunner:
             )
         )
 
-        runner = TestRunner()
+        runner = PytestRunner()
         result = runner.run(str(test_file.name), cwd=tmp_path)
 
         assert result.passed is False

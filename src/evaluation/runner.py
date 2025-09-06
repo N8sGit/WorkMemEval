@@ -16,7 +16,7 @@ from ..core.task_specification import TaskSpecification, CheckpointSpecification
 from ..core.action_trace import ActionTracer, TaskTrace, ActionType
 from ..core.plugin_interfaces import AgentImplementation, MemorySystem
 from ..evaluation.results import EvaluationResult, CheckpointResult
-from ..evaluation.test_runner import TestRunner, TestRunResult
+from ..evaluation.test_runner import PytestRunner, TestRunResult
 from ..evaluation.monitoring import FileSystemWatcher
 
 
@@ -138,10 +138,10 @@ class BasicWorkMemEvalRunner:
                 from ..evaluation.docker_test_runner import DockerTestRunner
                 self.test_runner = DockerTestRunner(image=docker_image)
             except Exception as e:
-                print(f"Warning: failed to initialize DockerTestRunner, falling back to local TestRunner: {e}")
-                self.test_runner = TestRunner()
+                print(f"Warning: failed to initialize DockerTestRunner, falling back to local PytestRunner: {e}")
+                self.test_runner = PytestRunner()
         else:
-            self.test_runner = TestRunner()
+            self.test_runner = PytestRunner()
         self.fs_watcher = FileSystemWatcher()
     
     async def run_evaluation(

@@ -55,7 +55,7 @@ class FileSystemWatcher:
 class ProcessMonitor:
     """Placeholder for process-level monitoring.
 
-    Currently not used directly because TestRunner already captures timing and exit code.
+    Currently not used directly because PytestRunner already captures timing and exit code.
     This can be extended later to capture CPU/mem metrics.
     """
 
