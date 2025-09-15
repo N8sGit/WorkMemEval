@@ -5,30 +5,29 @@ Production LLM integration for WorkMemEval with support for multiple providers.
 Currently supports OpenRouter (200+ models) with extensible architecture.
 """
 
-from typing import Dict, Any
-
-from ..core.llm_interfaces import LLMInterface, LLMConfig, LLMProvider, LLMResponse
+from ..core.llm_interfaces import LLMConfig, LLMInterface, LLMProvider, LLMResponse
 from .openrouter_provider import OpenRouterProvider, resolve_model_name
 
 
 class UnsupportedProviderError(Exception):
     """Raised when an unsupported LLM provider is requested"""
+
     pass
 
 
 class LLMFactory:
     """Factory for creating LLM providers"""
-    
+
     @staticmethod
     def create_provider(config: LLMConfig) -> LLMInterface:
         """Create LLM provider based on configuration
-        
+
         Args:
             config: LLM configuration specifying provider and parameters
-            
+
         Returns:
             Configured LLM provider instance
-            
+
         Raises:
             UnsupportedProviderError: If the requested provider is not supported
         """
@@ -41,7 +40,7 @@ class LLMFactory:
                 temperature=config.temperature,
                 max_tokens=config.max_tokens,
                 timeout_seconds=config.timeout_seconds,
-                provider_config=config.provider_config
+                provider_config=config.provider_config,
             )
             return OpenRouterProvider(resolved_config)
         else:
@@ -55,6 +54,12 @@ class LLMFactory:
 
 # Export main classes
 __all__ = [
-    'LLMInterface', 'LLMConfig', 'LLMResponse', 'LLMProvider', 
-    'OpenRouterProvider', 'LLMFactory', 'resolve_model_name', 'UnsupportedProviderError'
+    "LLMInterface",
+    "LLMConfig",
+    "LLMResponse",
+    "LLMProvider",
+    "OpenRouterProvider",
+    "LLMFactory",
+    "resolve_model_name",
+    "UnsupportedProviderError",
 ]

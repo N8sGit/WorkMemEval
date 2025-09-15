@@ -9,11 +9,10 @@ Includes:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-from ..core.action_trace import TaskTrace, ActionType, CheckpointTrace, ActionTraceEntry
+from ..core.action_trace import ActionTraceEntry, ActionType, TaskTrace
 from ..core.task_specification import TaskSpecification
 
 
@@ -33,12 +32,18 @@ def compute_memory_fidelity(task_trace: TaskTrace) -> Dict[str, float]:
         total_actions += len(cp.actions)
         total_errors += len(cp.errors_encountered)
         for a in cp.actions:
-            if a.file_path and a.action_type in (ActionType.FILE_READ, ActionType.FILE_WRITE, ActionType.FILE_MODIFY):
+            if a.file_path and a.action_type in (
+                ActionType.FILE_READ,
+                ActionType.FILE_WRITE,
+                ActionType.FILE_MODIFY,
+            ):
                 file_accesses.append(a.file_path)
 
     unique_files = len(set(file_accesses)) if file_accesses else 0
     total_accesses = len(file_accesses)
-    context_reread_rate = (1.0 - (unique_files / total_accesses)) if total_accesses > 0 else 0.0
+    context_reread_rate = (
+        (1.0 - (unique_files / total_accesses)) if total_accesses > 0 else 0.0
+    )
 
     error_rate = total_errors / max(1, total_actions)
 
@@ -57,7 +62,9 @@ def _basename(path_str: str) -> str:
         return path_str
 
 
-def compute_contextual_relevance(task_spec: TaskSpecification, task_trace: TaskTrace) -> Dict[str, float]:
+def compute_contextual_relevance(
+    task_spec: TaskSpecification, task_trace: TaskTrace
+) -> Dict[str, float]:
     # Required files (v1): union of stub_file across checkpoints (exclude test files for recall proxy)
     required: set[str] = set()
     for cp in task_spec.checkpoints:
@@ -68,7 +75,11 @@ def compute_contextual_relevance(task_spec: TaskSpecification, task_trace: TaskT
     accessed: set[str] = set()
     for cp in task_trace.checkpoint_traces:
         for a in cp.actions:
-            if a.file_path and a.action_type in (ActionType.FILE_READ, ActionType.FILE_WRITE, ActionType.FILE_MODIFY):
+            if a.file_path and a.action_type in (
+                ActionType.FILE_READ,
+                ActionType.FILE_WRITE,
+                ActionType.FILE_MODIFY,
+            ):
                 accessed.add(_basename(a.file_path))
 
     if len(accessed) == 0:
@@ -81,7 +92,11 @@ def compute_contextual_relevance(task_spec: TaskSpecification, task_trace: TaskT
     else:
         recall = len(accessed & required) / len(required)
 
-    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+    f1 = (
+        (2 * precision * recall / (precision + recall))
+        if (precision + recall) > 0
+        else 0.0
+    )
     return {
         "relevance_precision": precision,
         "relevance_recall": recall,
@@ -112,18 +127,20 @@ def _executed_action_token(a: ActionTraceEntry) -> Optional[str]:
 
 def _lcs_len(a: List[str], b: List[str]) -> int:
     n, m = len(a), len(b)
-    dp = [[0]*(m+1) for _ in range(n+1)]
-    for i in range(1, n+1):
-        ai = a[i-1]
-        for j in range(1, m+1):
-            if ai == b[j-1]:
-                dp[i][j] = dp[i-1][j-1] + 1
+    dp = [[0] * (m + 1) for _ in range(n + 1)]
+    for i in range(1, n + 1):
+        ai = a[i - 1]
+        for j in range(1, m + 1):
+            if ai == b[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
             else:
-                dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
     return dp[n][m]
 
 
-def _greedy_match_ratio(plan: List[str], exec_: List[str], numerator_over: str) -> float:
+def _greedy_match_ratio(
+    plan: List[str], exec_: List[str], numerator_over: str
+) -> float:
     # If numerator_over == 'plan': matched / len(plan)
     # If numerator_over == 'exec': matched / len(exec_)
     # This function keeps order-sensitive matching.
@@ -135,11 +152,13 @@ def _greedy_match_ratio(plan: List[str], exec_: List[str], numerator_over: str) 
             j += 1
         else:
             j += 1
-    denom = len(plan) if numerator_over == 'plan' else len(exec_)
+    denom = len(plan) if numerator_over == "plan" else len(exec_)
     return matched / max(1, denom)
 
 
-def _time_on_plan_ratio(exec_actions: List[ActionTraceEntry], exec_tokens: List[str], plan: List[str]) -> float:
+def _time_on_plan_ratio(
+    exec_actions: List[ActionTraceEntry], exec_tokens: List[str], plan: List[str]
+) -> float:
     # Build indices of matched executed actions via greedy exec->plan matching
     i = j = 0
     matched_exec_idxs: set[int] = set()
@@ -154,14 +173,18 @@ def _time_on_plan_ratio(exec_actions: List[ActionTraceEntry], exec_tokens: List[
     total = 0.0
     on_plan = 0.0
     for k in range(len(exec_actions) - 1):
-        dt = max(0.0, (exec_actions[k+1].timestamp - exec_actions[k].timestamp) or 0.0)
+        dt = max(
+            0.0, (exec_actions[k + 1].timestamp - exec_actions[k].timestamp) or 0.0
+        )
         total += dt
         if k in matched_exec_idxs:
             on_plan += dt
     return (on_plan / total) if total > 0 else 0.0
 
 
-def compute_plan_compliance(task_spec: TaskSpecification, task_trace: TaskTrace) -> Dict[str, float]:
+def compute_plan_compliance(
+    task_spec: TaskSpecification, task_trace: TaskTrace
+) -> Dict[str, float]:
     if not task_trace or not task_trace.checkpoint_traces:
         return {
             "plan_coverage": 0.0,
@@ -180,7 +203,9 @@ def compute_plan_compliance(task_spec: TaskSpecification, task_trace: TaskTrace)
     for cp in task_trace.checkpoint_traces:
         # Extract plan from first PLANNING action metadata if present
         plan_steps: List[Dict] = []
-        planning_actions = [a for a in cp.actions if a.action_type == ActionType.PLANNING]
+        planning_actions = [
+            a for a in cp.actions if a.action_type == ActionType.PLANNING
+        ]
         if planning_actions:
             first_plan = planning_actions[0]
             plan_steps = first_plan.metadata.get("plan", []) or []
@@ -199,14 +224,27 @@ def compute_plan_compliance(task_spec: TaskSpecification, task_trace: TaskTrace)
 
         # Coverage (order-insensitive): multiset overlap of planned vs executed tokens
         from collections import Counter
+
         plan_counts = Counter(planned_tokens)
         exec_counts = Counter(exec_tokens)
-        matched_counts = sum(min(plan_counts[t], exec_counts.get(t, 0)) for t in plan_counts)
+        matched_counts = sum(
+            min(plan_counts[t], exec_counts.get(t, 0)) for t in plan_counts
+        )
         coverage = matched_counts / max(1, len(planned_tokens))
         # Order score (order-sensitive): LCS over token sequences
-        order = (_lcs_len(planned_tokens, exec_tokens) / max(1, len(planned_tokens))) if planned_tokens else 0.0
-        on_plan = _greedy_match_ratio(planned_tokens, exec_tokens, numerator_over='exec')
-        time_ratio = _time_on_plan_ratio(exec_actions, exec_tokens, planned_tokens) if exec_actions else 0.0
+        order = (
+            (_lcs_len(planned_tokens, exec_tokens) / max(1, len(planned_tokens)))
+            if planned_tokens
+            else 0.0
+        )
+        on_plan = _greedy_match_ratio(
+            planned_tokens, exec_tokens, numerator_over="exec"
+        )
+        time_ratio = (
+            _time_on_plan_ratio(exec_actions, exec_tokens, planned_tokens)
+            if exec_actions
+            else 0.0
+        )
 
         coverages.append(coverage)
         orders.append(order)
@@ -225,10 +263,11 @@ def compute_plan_compliance(task_spec: TaskSpecification, task_trace: TaskTrace)
     }
 
 
-def compute_all_metrics(task_spec: TaskSpecification, task_trace: TaskTrace) -> Dict[str, float]:
+def compute_all_metrics(
+    task_spec: TaskSpecification, task_trace: TaskTrace
+) -> Dict[str, float]:
     m: Dict[str, float] = {}
     m.update(compute_memory_fidelity(task_trace))
     m.update(compute_contextual_relevance(task_spec, task_trace))
     m.update(compute_plan_compliance(task_spec, task_trace))
     return m
-

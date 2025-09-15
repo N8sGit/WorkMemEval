@@ -3,11 +3,8 @@
 Unit tests for the TestRunner component.
 """
 
-import sys
 import textwrap
 from pathlib import Path
-
-import pytest
 
 from src.evaluation.test_runner import PytestRunner
 
@@ -54,4 +51,3 @@ class TestPytestRunner:
         assert result.duration_s >= 0
         assert isinstance(result.stdout_tail, str)
         assert isinstance(result.errors, list)
-

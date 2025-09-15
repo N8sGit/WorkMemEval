@@ -5,12 +5,10 @@ Executes pytest inside a hardened Docker container with network disabled by
 default, non-root user, read-only root FS, and constrained resources.
 """
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List, Optional
 import subprocess
 import time
-import os
+from pathlib import Path
+from typing import List, Optional
 
 from .test_runner import TestRunResult
 
@@ -85,7 +83,7 @@ class DockerTestRunner:
             )
 
             duration = time.time() - start
-            stdout_tail = (proc.stdout or "")[-self.tail_chars:]
+            stdout_tail = (proc.stdout or "")[-self.tail_chars :]
             stderr = proc.stderr or ""
             passed = proc.returncode == 0
 
@@ -111,7 +109,7 @@ class DockerTestRunner:
                 passed=False,
                 duration_s=duration,
                 exit_code=124,
-                stdout_tail=stdout_tail[-self.tail_chars:],
+                stdout_tail=stdout_tail[-self.tail_chars :],
                 errors=["Test run timed out"],
             )
         except FileNotFoundError:
@@ -133,4 +131,3 @@ class DockerTestRunner:
                 stdout_tail="",
                 errors=[f"Docker test runner error: {e}"],
             )
-

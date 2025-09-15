@@ -8,11 +8,11 @@ from pathlib import Path
 
 import pytest
 
-from src.evaluation.runner import BasicWorkMemEvalRunner
 from src.agents.reference_agent import ReferenceWorkMemAgent
-from src.memory.context_memory import ContextMemorySystem
-from src.core.task_specification import TaskSpecification, CheckpointSpecification
 from src.core.action_trace import ActionType
+from src.core.task_specification import CheckpointSpecification, TaskSpecification
+from src.evaluation.runner import BasicWorkMemEvalRunner
+from src.memory.context_memory import ContextMemorySystem
 
 
 @pytest.mark.asyncio
@@ -52,13 +52,16 @@ async def test_runner_logs_test_execution(tmp_path: Path):
     )
 
     runner = BasicWorkMemEvalRunner()
-    memory = ContextMemorySystem({'max_items': 100})
-    agent = ReferenceWorkMemAgent(memory, {'max_iterations': 10})
+    memory = ContextMemorySystem({"max_items": 100})
+    agent = ReferenceWorkMemAgent(memory, {"max_iterations": 10})
 
     # Patch the loader to return our synthetic task
     from unittest.mock import patch
-    with patch.object(runner.task_loader, 'load_task', return_value=task_spec):
-        result = await runner.run_evaluation(tmp_path, agent, memory, working_directory=tmp_path)
+
+    with patch.object(runner.task_loader, "load_task", return_value=task_spec):
+        result = await runner.run_evaluation(
+            tmp_path, agent, memory, working_directory=tmp_path
+        )
 
     # Assert TEST_RUN and COMMAND_EXECUTE actions exist
     task_trace = agent.get_behavioral_trace()
@@ -70,10 +73,9 @@ async def test_runner_logs_test_execution(tmp_path: Path):
     # Ensure a ContextSnapshot was logged with delta metadata
     assert len(cp_trace.context_snapshots) >= 1
     snapshot = cp_trace.context_snapshots[-1]
-    assert isinstance(snapshot.metadata.get('created'), list)
-    assert isinstance(snapshot.metadata.get('modified'), list)
-    assert isinstance(snapshot.metadata.get('deleted'), list)
+    assert isinstance(snapshot.metadata.get("created"), list)
+    assert isinstance(snapshot.metadata.get("modified"), list)
+    assert isinstance(snapshot.metadata.get("deleted"), list)
 
     # Check that checkpoint result reflects pass
     assert result.checkpoint_results[0].tests_passed is True
-

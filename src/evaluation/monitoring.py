@@ -4,10 +4,10 @@ Monitoring utilities for WorkMemEval
 Includes a simple file system watcher (polling) and a process monitor placeholder.
 """
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
-import time
+from typing import Dict, List
 
 
 @dataclass
@@ -38,7 +38,7 @@ class FileSystemWatcher:
         deleted = sorted(before_keys - after_keys)
 
         modified: List[str] = []
-        for path in (before_keys & after_keys):
+        for path in before_keys & after_keys:
             b = before.files[path]
             a = after.files[path]
             if b.get("mtime") != a.get("mtime") or b.get("size") != a.get("size"):
@@ -61,4 +61,3 @@ class ProcessMonitor:
 
     def __init__(self) -> None:
         pass
-

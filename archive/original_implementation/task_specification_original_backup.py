@@ -7,11 +7,12 @@ architectural freedom zones.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any, Union
-from enum import Enum
+
 import json
+from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 
 class CheckpointType(Enum):
@@ -531,9 +532,9 @@ class ContextWindowCondition:
     condition_name: str
     condition_type: ContextConditionType
     token_limit: Optional[int] = None  # Fixed limit for standardized conditions
-    overflow_multiplier: Optional[float] = (
-        None  # For overflow conditions (e.g., 2.0 = 2x native)
-    )
+    overflow_multiplier: Optional[
+        float
+    ] = None  # For overflow conditions (e.g., 2.0 = 2x native)
     description: str = ""
 
     def __post_init__(self):
