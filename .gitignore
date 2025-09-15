@@ -20,3 +20,5 @@ evaluation_workspace/
 dist/
 build/
 .kiro
+
+.ruff_cache
