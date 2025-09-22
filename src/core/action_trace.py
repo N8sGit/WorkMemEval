@@ -46,6 +46,13 @@ class ActionType(Enum):
     # Error handling
     ERROR_ENCOUNTERED = "error_encountered"
     ERROR_RECOVERY = "error_recovery"
+    
+    # Enhanced evaluation actions
+    PROBE_INJECTION = "probe_injection"
+    PROBE_RESPONSE = "probe_response"
+    CONTEXT_SNAPSHOT = "context_snapshot"
+    CONTEXT_OVERFLOW = "context_overflow"
+    MEMORY_PROBE_SCORE = "memory_probe_score"
 
 
 @dataclass

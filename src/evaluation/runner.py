@@ -129,11 +129,42 @@ class BasicWorkMemEvalRunner:
     - Agent and memory system initialization
     - Checkpoint progression
     - Action tracing and result collection
+    
+    Enhanced Features (Tier 2):
+    - Memory probe injection and scoring
+    - Context window management
+    - Three-pillar metrics calculation
     """
 
-    def __init__(self, containerized: bool = False, docker_image: Optional[str] = None):
+    def __init__(self, 
+                 containerized: bool = False, 
+                 docker_image: Optional[str] = None,
+                 enable_enhanced_evaluation: bool = False,
+                 context_condition: Optional[str] = None):
+        """
+        Initialize the evaluation runner.
+        
+        Args:
+            containerized: Use Docker for test execution
+            docker_image: Docker image for containerized execution
+            enable_enhanced_evaluation: Enable enhanced memory evaluation features
+            context_condition: Context window condition ("standardized", "native", "overflow")
+        """
         self.task_loader = TaskSpecificationLoader()
         self.current_evaluation: Optional[Dict[str, Any]] = None
+        
+        # Enhanced evaluation feature flags
+        self.enhanced_evaluation_enabled = enable_enhanced_evaluation
+        self.context_condition = context_condition
+        
+        # Initialize enhanced components (will be None if not enabled)
+        self.context_window_manager = None
+        self.probe_scheduler = None
+        
+        # Initialize enhanced components if enabled
+        if self.enhanced_evaluation_enabled:
+            self._initialize_enhanced_components()
+        
         if containerized:
             try:
                 from ..evaluation.docker_test_runner import DockerTestRunner
@@ -147,6 +178,22 @@ class BasicWorkMemEvalRunner:
         else:
             self.test_runner = PytestRunner()
         self.fs_watcher = FileSystemWatcher()
+    
+    def _initialize_enhanced_components(self):
+        """Initialize enhanced evaluation components when feature is enabled"""
+        try:
+            # Import enhanced components (will be implemented in subsequent tasks)
+            from .context_window_manager import ContextWindowManager
+            from .probe_scheduler import ProbeScheduler
+            
+            self.context_window_manager = ContextWindowManager()
+            self.probe_scheduler = ProbeScheduler()
+            print("Enhanced evaluation components initialized")
+        except ImportError:
+            # Enhanced components not yet available, use placeholder
+            self.context_window_manager = None
+            self.probe_scheduler = None
+            print("Warning: Enhanced evaluation enabled but components not available")
 
     async def run_evaluation(
         self,
@@ -154,6 +201,7 @@ class BasicWorkMemEvalRunner:
         agent: AgentImplementation,
         memory_system: MemorySystem,
         working_directory: Optional[Path] = None,
+        context_condition: Optional[str] = None,
     ) -> EvaluationResult:
         """
         Run a complete evaluation of an agent on a task.
@@ -169,6 +217,14 @@ class BasicWorkMemEvalRunner:
         """
         # Load and validate task
         task_spec = self.task_loader.load_task(task_path)
+        
+        # Enable enhanced mode if task has enhanced features or if explicitly enabled
+        if self.enhanced_evaluation_enabled or task_spec.is_enhanced_mode():
+            task_spec = task_spec.enable_enhanced_mode()
+            print(f"Enhanced evaluation mode enabled for task: {task_spec.task_id}")
+        
+        # Override context condition if provided
+        effective_context_condition = context_condition or self.context_condition
 
         # Set up working directory
         if working_directory is None:
@@ -204,10 +260,15 @@ class BasicWorkMemEvalRunner:
                 "start_time": evaluation_start,
             }
 
-            # Execute the task
-            success, checkpoint_results = await self._execute_task(
-                task_spec, agent, action_tracer, working_directory
-            )
+            # Execute the task (enhanced or legacy mode)
+            if self.enhanced_evaluation_enabled or task_spec.is_enhanced_mode():
+                success, checkpoint_results = await self._execute_enhanced_task(
+                    task_spec, agent, action_tracer, working_directory, effective_context_condition
+                )
+            else:
+                success, checkpoint_results = await self._execute_task(
+                    task_spec, agent, action_tracer, working_directory
+                )
 
             # Get behavioral trace
             task_trace = agent.get_behavioral_trace()
@@ -413,6 +474,237 @@ class BasicWorkMemEvalRunner:
             print("✅ All checkpoints completed successfully (tests passed)")
         else:
             print("⚠️  One or more checkpoints failed tests")
+
+        return success, checkpoint_results
+
+    async def _execute_enhanced_task(
+        self,
+        task_spec: TaskSpecification,
+        agent: AgentImplementation,
+        action_tracer: ActionTracer,
+        working_directory: Path,
+        context_condition: Optional[str] = None,
+    ) -> Tuple[bool, List[CheckpointResult]]:
+        """
+        Execute task with enhanced evaluation features including:
+        - Memory probe injection
+        - Context window management
+        - Enhanced metrics collection
+        """
+        print(f"\n=== Executing Enhanced Task: {task_spec.title} ===")
+        
+        # Initialize context window management
+        if self.context_window_manager and context_condition:
+            self.context_window_manager.configure_condition(context_condition, agent)
+            print(f"Context window condition: {context_condition}")
+        
+        # Set up the agent's action tracer
+        agent.action_tracer = action_tracer
+
+        # Initialize secure file operations for the agent
+        if hasattr(agent, "initialize_secure_file_ops"):
+            agent.initialize_secure_file_ops(working_directory)
+
+        # Store initial task context (delegate to agent)
+        agent._store_task_context(task_spec)
+
+        # Track per-checkpoint results
+        checkpoint_results: List[CheckpointResult] = []
+        
+        # Schedule memory probes if available
+        scheduled_probes = {}
+        if self.probe_scheduler and task_spec.memory_probes:
+            scheduled_probes = self.probe_scheduler.schedule_probes(task_spec.memory_probes, task_spec)
+            total_probes = sum(len(probes) for probes in scheduled_probes.values())
+            print(f"Scheduled {total_probes} memory probes across {len(scheduled_probes)} checkpoints")
+
+        # Execute each checkpoint in sequence with enhanced orchestration
+        for checkpoint in task_spec.checkpoints:
+            print(f"\n--- Executing Enhanced Checkpoint: {checkpoint.checkpoint_id} ---")
+
+            # Start checkpoint tracing
+            action_tracer.start_checkpoint(checkpoint.checkpoint_id)
+            action_tracer.log_action(
+                ActionType.CHECKPOINT_START, success=True, title=checkpoint.title
+            )
+
+            # File system snapshot before execution
+            snapshot_before = self.fs_watcher.snapshot(working_directory)
+            
+            # Context window monitoring
+            if self.context_window_manager:
+                context_metrics = self.context_window_manager.monitor_context_usage(agent, checkpoint)
+                action_tracer.log_action(
+                    ActionType.CONTEXT_SNAPSHOT,
+                    success=True,
+                    context_tokens=context_metrics.current_tokens,
+                    context_condition=context_condition,
+                    utilization_percentage=context_metrics.utilization_percentage,
+                    efficiency_score=context_metrics.efficiency_score,
+                    context_state=context_metrics.state.value
+                )
+                
+                # Trigger compression if approaching overflow
+                if (context_metrics.state in [context_metrics.state.APPROACHING_LIMIT, context_metrics.state.OVERFLOW] 
+                    and hasattr(memory_system, 'compress_context')):
+                    compression_result = self.context_window_manager.trigger_compression_event(
+                        agent, memory_system, action_tracer
+                    )
+
+            try:
+                # Inject memory probes if scheduled for this checkpoint
+                if checkpoint.checkpoint_id in scheduled_probes:
+                    probes = scheduled_probes[checkpoint.checkpoint_id]
+                    for probe in probes:
+                        probe_response = await self.probe_scheduler.inject_probe_at_checkpoint(
+                            probe, agent, action_tracer, checkpoint
+                        )
+                        # Store probe response in enhanced metrics
+                        if "probe_responses" not in enhanced_metrics:
+                            enhanced_metrics["probe_responses"] = []
+                        enhanced_metrics["probe_responses"].append({
+                            "probe_id": probe_response.probe_id,
+                            "success": probe_response.success,
+                            "score": probe_response.score,
+                            "pillar": probe.pillar.value
+                        })
+
+                # Execute the checkpoint (properly awaited)
+                await agent.execute_checkpoint(checkpoint)
+
+                # After agent work, run tests for this checkpoint
+                cmd_display = f"pytest -q {checkpoint.test_file}"
+                test_result = self.test_runner.run(
+                    checkpoint.test_file, cwd=working_directory
+                )
+                test_duration_ms = int(test_result.duration_s * 1000)
+
+                # Log command execution
+                action_tracer.log_action(
+                    ActionType.COMMAND_EXECUTE,
+                    success=(test_result.exit_code == 0),
+                    duration_ms=test_duration_ms,
+                    command=cmd_display,
+                    exit_code=test_result.exit_code,
+                )
+
+                # Log test run
+                action_tracer.log_action(
+                    ActionType.TEST_RUN,
+                    success=test_result.passed,
+                    duration_ms=test_duration_ms,
+                    test_file=checkpoint.test_file,
+                    exit_code=test_result.exit_code,
+                )
+
+                # Compute file system delta and log a context snapshot
+                snapshot_after = self.fs_watcher.snapshot(working_directory)
+                fs_delta = self.fs_watcher.diff(snapshot_before, snapshot_after)
+                files_in_context = fs_delta.get("created", []) + fs_delta.get(
+                    "modified", []
+                )
+                action_tracer.log_context_snapshot(
+                    files_in_context=files_in_context,
+                    working_directory=str(working_directory),
+                    created=fs_delta.get("created", []),
+                    modified=fs_delta.get("modified", []),
+                    deleted=fs_delta.get("deleted", []),
+                    created_count=len(fs_delta.get("created", [])),
+                    modified_count=len(fs_delta.get("modified", [])),
+                    deleted_count=len(fs_delta.get("deleted", [])),
+                )
+
+                # Enhanced metrics collection
+                enhanced_metrics = {}
+                if self.context_window_manager:
+                    efficiency_metrics = self.context_window_manager.calculate_context_efficiency(agent, checkpoint)
+                    enhanced_metrics.update({
+                        "context_efficiency": efficiency_metrics.relevance_precision,
+                        "information_density": efficiency_metrics.information_density,
+                        "redundancy_rate": efficiency_metrics.redundancy_rate,
+                        "compression_effectiveness": efficiency_metrics.compression_effectiveness
+                    })
+                    
+                    # Detect context re-reading patterns
+                    reread_events = self.context_window_manager.detect_context_rereading(agent)
+                    if reread_events:
+                        enhanced_metrics["context_rereading_events"] = len(reread_events)
+                        enhanced_metrics["redundancy_penalty"] = sum(e["redundancy_score"] for e in reread_events)
+
+                # Log checkpoint completion before closing the trace
+                action_tracer.log_action(
+                    ActionType.CHECKPOINT_COMPLETE,
+                    success=test_result.passed,
+                    tests_passed=test_result.passed,
+                    enhanced_metrics=enhanced_metrics,
+                )
+
+                # Complete the checkpoint trace using tests_passed as the completion criteria
+                action_tracer.complete_checkpoint(tests_passed=test_result.passed)
+
+                # Retrieve the checkpoint trace to compute actions/files
+                cp_trace = agent.get_behavioral_trace().get_checkpoint_trace(
+                    checkpoint.checkpoint_id
+                )
+                actions_taken = len(cp_trace.actions) if cp_trace else 0
+                files_accessed = []
+                if cp_trace:
+                    files_accessed = list(cp_trace.get_file_access_pattern().keys())
+
+                # Build enhanced checkpoint result
+                checkpoint_result = CheckpointResult(
+                    checkpoint_id=checkpoint.checkpoint_id,
+                    completed_successfully=test_result.passed,
+                    execution_time_seconds=test_result.duration_s,
+                    tests_passed=test_result.passed,
+                    actions_taken=actions_taken,
+                    files_accessed=files_accessed,
+                    errors_encountered=test_result.errors,
+                )
+                
+                # Add enhanced metrics if available
+                if enhanced_metrics:
+                    checkpoint_result.metadata = enhanced_metrics
+                
+                checkpoint_results.append(checkpoint_result)
+
+                if test_result.passed:
+                    print(f"✅ Enhanced Checkpoint {checkpoint.checkpoint_id} tests passed")
+                else:
+                    print(
+                        f"❌ Enhanced Checkpoint {checkpoint.checkpoint_id} tests failed (exit {test_result.exit_code})"
+                    )
+
+            except Exception as e:
+                print(f"❌ Enhanced Checkpoint {checkpoint.checkpoint_id} failed with error: {e}")
+                action_tracer.log_action(
+                    ActionType.ERROR_ENCOUNTERED, success=False, error_message=str(e)
+                )
+                action_tracer.complete_checkpoint(tests_passed=False)
+                checkpoint_results.append(
+                    CheckpointResult(
+                        checkpoint_id=checkpoint.checkpoint_id,
+                        completed_successfully=False,
+                        execution_time_seconds=0.0,
+                        tests_passed=False,
+                        actions_taken=0,
+                        files_accessed=[],
+                        errors_encountered=[str(e)],
+                    )
+                )
+                # Continue to next checkpoint for observability rather than early exit
+
+        # Task success is defined as all checkpoint tests passing
+        success = (
+            all(cp.tests_passed for cp in checkpoint_results)
+            if checkpoint_results
+            else False
+        )
+
+        if success:
+            print("✅ All enhanced checkpoints completed successfully (tests passed)")
+        else:
+            print("⚠️  One or more enhanced checkpoints failed tests")
 
         return success, checkpoint_results
 

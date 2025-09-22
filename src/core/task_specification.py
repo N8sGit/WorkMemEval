@@ -568,8 +568,8 @@ class TaskSpecification:
 
     def enable_enhanced_mode(self) -> "TaskSpecification":
         """Convert task to enhanced mode with auto-configuration"""
-        if self.is_enhanced_mode():
-            return self  # Already enhanced
+        if self.is_enhanced_mode() and self.enhanced_complexity is not None:
+            return self  # Already fully enhanced
 
         # Generate enhanced complexity profile
         self.enhanced_complexity = EnhancedComplexityProfile.from_legacy_task(self)
