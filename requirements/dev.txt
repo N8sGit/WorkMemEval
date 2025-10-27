@@ -5,7 +5,7 @@ isort==5.13.2
 bandit==1.7.9
 pip-audit==2.7.3
 requests==2.31.0
-python-dotenv==1.0.0
+python-dotenv==1.2.1
 
 # LLM integration dependencies
 aiohttp==3.10.10
