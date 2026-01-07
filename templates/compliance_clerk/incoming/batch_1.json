@@ -1,0 +1,50 @@
+[
+    {
+        "id": "exp_101",
+        "category": "meal",
+        "amount": 40.00,
+        "location": "Austin",
+        "has_receipt": false,
+        "description": "Lunch with team"
+    },
+    {
+        "id": "exp_102",
+        "category": "meal",
+        "amount": 60.00,
+        "location": "Austin",
+        "has_receipt": false,
+        "description": "Dinner"
+    },
+    {
+        "id": "exp_103",
+        "category": "meal",
+        "amount": 70.00,
+        "location": "NYC",
+        "has_receipt": false,
+        "description": "Client Dinner"
+    },
+    {
+        "id": "exp_104",
+        "category": "rideshare",
+        "vendor": "Uber",
+        "amount": 25.00,
+        "project_code": "INT-Sales",
+        "description": "Ride to airport"
+    },
+    {
+        "id": "exp_105",
+        "category": "rideshare",
+        "vendor": "Lyft",
+        "amount": 30.00,
+        "project_code": "EXT-AcmeCorp",
+        "description": "Ride to client site"
+    },
+    {
+        "id": "exp_106",
+        "category": "alcohol",
+        "amount": 15.00,
+        "location": "Austin",
+        "has_receipt": true,
+        "description": "Beer"
+    }
+]

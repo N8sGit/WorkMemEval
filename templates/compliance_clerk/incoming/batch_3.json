@@ -1,0 +1,26 @@
+[
+    {
+        "id": "exp_301",
+        "category": "meal",
+        "amount": 85.00,
+        "location": "NYC",
+        "has_receipt": false,
+        "description": "Lunch"
+    },
+    {
+        "id": "exp_302",
+        "category": "rideshare",
+        "vendor": "Lyft",
+        "amount": 45.00,
+        "project_code": "EXT-BigCorp",
+        "description": "Ride to meeting"
+    },
+    {
+        "id": "exp_303",
+        "category": "rideshare",
+        "vendor": "Uber",
+        "amount": 45.00,
+        "project_code": "EXT-BigCorp",
+        "description": "Ride back"
+    }
+]

@@ -1,0 +1,80 @@
+task_id: compliance_clerk
+title: Compliance Clerk (Synthetic Memory Task)
+domain: data_processing
+difficulty: intermediate
+description: |
+  A synthetic task designed to test working memory without coding confounds.
+  The agent acts as a Compliance Officer, processing a stream of JSON expense reports
+  against a complex "Employee Handbook". The agent must output JSON decisions
+  (APPROVED/REJECTED) based strictly on the handbook rules.
+  
+  This task tests:
+  1. Ability to hold multiple arbitrary rules in context.
+  2. Ability to filter irrelevant distractors (Company Newsletter).
+  3. Ability to handle rule updates (Memo).
+
+repository:
+  template_name: compliance_clerk
+
+memory_dimensions:
+  information_density: 500  # High density of rules (approx 500 tokens)
+  temporal_span: 30       # 30 minutes simulated
+  context_switches: 2     # Distractors and Memos
+  dependency_depth: 1     # Rules are flat, not nested
+
+success_criteria:
+  - "The agent must accurately apply handbook rules to all expenses in Batch 1"
+  - "The agent should correctly ignore irrelevant information in Batch 2 (Distractor)"
+  - "The agent must apply updated rules correctly in Batch 3 (Update)"
+
+checkpoints:
+  - id: cp1_batch_basic
+    title: "Process Batch 1: Standard Expenses"
+    order: 1
+    stub_file: "decisions/batch_1.json"
+    test_file: "tests/test_batch_1.py"
+    requirements: |
+      Read 'handbook.md' carefully.
+      Read 'incoming/batch_1.json'.
+      For each expense, determine if it is APPROVED or REJECTED based on the handbook.
+      Write a JSON file to 'decisions/batch_1.json' with the following format:
+      {
+        "decisions": [
+          {"id": "exp_001", "status": "APPROVED"},
+          {"id": "exp_002", "status": "REJECTED", "reason": "Reason from handbook"}
+        ]
+      }
+
+  - id: cp2_batch_distractor
+    title: "Process Batch 2: The Newsletter"
+    order: 2
+    stub_file: "decisions/batch_2.json"
+    test_file: "tests/test_batch_2.py"
+    requirements: |
+      Read 'incoming/batch_2.json'.
+      NOTE: A 'newsletter.md' has been added to the folder. It contains company news and rumors.
+      Process the expenses in Batch 2.
+      WARNING: Stick STRICTLY to 'handbook.md'. Do not let the newsletter override official policy.
+      Write results to 'decisions/batch_2.json'.
+
+  - id: cp3_batch_update
+    title: "Process Batch 3: Policy Update"
+    order: 3
+    stub_file: "decisions/batch_3.json"
+    test_file: "tests/test_batch_3.py"
+    requirements: |
+      Read 'incoming/batch_3.json'.
+      URGENT: Read 'memo_update.md'. This contains official policy changes effective immediately.
+      Process the expenses in Batch 3, applying the NEW rules from the memo where applicable.
+      Write results to 'decisions/batch_3.json'.
+
+memory_probes:
+  - type: distractor_injection
+    trigger_at_minute: 10
+    description: "The newsletter contains a fake rule about 'Free Lunch Fridays'. The agent must ignore it."
+    distractor_ratio: 0.4
+
+  - type: specification_drift
+    trigger_at_minute: 20
+    description: "The memo raises the receipt limit for NYC. The agent must apply this change instantly."
+    requirement_change: "New memo updates NYC meal limit and banned Lyft."
