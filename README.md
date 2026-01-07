@@ -68,4 +68,59 @@ docker compose -f docker/compose.dev.yml run --rm eval "pytest -q /workspace/tes
 - Pre-commit hooks run in CI.
 - pip-audit checks dependencies listed in `requirements/dev.txt`.
 
+## Adding New Challenges
+
+WorkMemEval supports defining challenges (tasks) using a simple YAML format. This allows you to rapidly create new evaluation scenarios without writing complex Python configuration code.
+
+### 1. Define the Task Specification (YAML)
+
+Create a new `.yaml` file in `tasks/yaml/` (e.g., `tasks/yaml/my_new_task.yaml`). This file defines the "contract" for the task, including checkpoints, success criteria, and memory probes.
+
+**Key Fields:**
+*   **`task_id`**: Unique identifier (e.g., `ecommerce_refactor`).
+*   **`repository.template_name`**: The name of the folder you will create in Step 2.
+*   **`checkpoints`**: A list of milestones. Each needs:
+    *   `stub_file`: The file the agent should modify.
+    *   `test_file`: The test file used to verify success (path relative to the template root).
+*   **`memory_probes`**: Injections to test memory pillars (e.g., `distractor_injection`, `context_switch`).
+
+**Example Snippet:**
+```yaml
+task_id: my_task_01
+title: My New Task
+repository:
+  template_name: my_task_template  # Matches folder in templates/
+checkpoints:
+  - id: cp1_init
+    stub_file: src/main.py
+    test_file: tests/test_cp1.py
+    requirements: "Initialize the main class..."
+```
+
+### 2. Create the Repository Template
+
+Create a directory in `templates/` that matches your `template_name`. This defines the initial environment the agent starts with.
+
+**Directory Structure:**
+```text
+WorkMemEval/
+├── templates/
+│   └── my_task_template/       # Your template_name
+│       ├── src/
+│       │   └── main.py         # The stub file (initial state)
+│       ├── tests/
+│       │   ├── test_cp1.py     # Test for Checkpoint 1
+│       │   └── test_cp2.py     # Test for Checkpoint 2
+│       └── README.md           # Optional context
+```
+
+### 3. Verification
+
+Run the task using the CLI to ensure the harness loads it correctly and the agent can interact with it.
+
+```bash
+python3 -m src.cli run --task tasks/yaml/my_new_task.yaml
+```
+
+
 
