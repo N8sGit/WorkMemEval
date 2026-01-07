@@ -29,10 +29,10 @@ class TaskSpecificationLoader:
 
     def load_task(self, task_path: Path) -> TaskSpecification:
         """
-        Load a task specification from a JSON file.
+        Load a task specification from a JSON or YAML file.
 
         Args:
-            task_path: Path to the task JSON file
+            task_path: Path to the task file (json or yaml)
 
         Returns:
             TaskSpecification object
@@ -45,6 +45,19 @@ class TaskSpecificationLoader:
             raise FileNotFoundError(f"Task file not found: {task_path}")
 
         try:
+            # Handle YAML files
+            if task_path.suffix.lower() in ['.yaml', '.yml']:
+                from ..core.yaml_task_loader import load_yaml_task
+                yaml_spec = load_yaml_task(task_path, strict_mode=False)
+                task_spec = yaml_spec.to_task_specification()
+                
+                # Auto-enable enhanced mode for YAML tasks since they are modern
+                task_spec.enable_enhanced_mode()
+                
+                self.loaded_tasks[task_spec.task_id] = task_spec
+                return task_spec
+
+            # Handle JSON files
             with open(task_path, "r") as f:
                 task_data = json.load(f)
 
@@ -222,9 +235,18 @@ class BasicWorkMemEvalRunner:
         if self.enhanced_evaluation_enabled or task_spec.is_enhanced_mode():
             task_spec = task_spec.enable_enhanced_mode()
             print(f"Enhanced evaluation mode enabled for task: {task_spec.task_id}")
+            
+            # Lazy initialize enhanced components if needed
+            if not self.context_window_manager or not self.probe_scheduler:
+                self._initialize_enhanced_components()
         
-        # Override context condition if provided
+        # Override context condition if provided, or use default from task
         effective_context_condition = context_condition or self.context_condition
+        if not effective_context_condition:
+            if task_spec.context_conditions:
+                effective_context_condition = task_spec.context_conditions[0].condition_name
+            elif task_spec.is_enhanced_mode():
+                effective_context_condition = "native"
 
         # Set up working directory
         if working_directory is None:
@@ -531,6 +553,9 @@ class BasicWorkMemEvalRunner:
             # File system snapshot before execution
             snapshot_before = self.fs_watcher.snapshot(working_directory)
             
+            # Initialize enhanced metrics for this checkpoint
+            enhanced_metrics = {}
+            
             # Context window monitoring
             if self.context_window_manager:
                 context_metrics = self.context_window_manager.monitor_context_usage(agent, checkpoint)
@@ -615,7 +640,6 @@ class BasicWorkMemEvalRunner:
                 )
 
                 # Enhanced metrics collection
-                enhanced_metrics = {}
                 if self.context_window_manager:
                     efficiency_metrics = self.context_window_manager.calculate_context_efficiency(agent, checkpoint)
                     enhanced_metrics.update({

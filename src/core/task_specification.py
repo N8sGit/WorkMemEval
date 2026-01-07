@@ -574,8 +574,9 @@ class TaskSpecification:
         # Generate enhanced complexity profile
         self.enhanced_complexity = EnhancedComplexityProfile.from_legacy_task(self)
 
-        # Auto-configure memory probes based on complexity
-        self.memory_probes = self._auto_configure_probes()
+        # Auto-configure memory probes based on complexity if none exist
+        if not self.memory_probes:
+            self.memory_probes = self._auto_configure_probes()
 
         # Add default context conditions
         self.context_conditions = [
