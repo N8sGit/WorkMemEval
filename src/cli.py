@@ -17,10 +17,10 @@ import json
 from pathlib import Path
 from typing import List
 
-from .agents.simple_agent import SimpleWorkMemAgent
+from .agents.reference_agent import ReferenceWorkMemAgent
 from .evaluation.results import ComparisonResult, EvaluationResult
 from .evaluation.runner import BasicWorkMemEvalRunner
-from .memory.simple_memory import SimpleContextMemory
+from .memory import SimpleContextMemory
 
 
 def cmd_run(args: argparse.Namespace) -> int:
@@ -28,7 +28,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     working_directory = Path(args.workspace) if args.workspace else None
 
     memory = SimpleContextMemory({"max_items": 100})
-    agent = SimpleWorkMemAgent(
+    agent = ReferenceWorkMemAgent(
         memory,
         {
             "max_iterations": 10,
