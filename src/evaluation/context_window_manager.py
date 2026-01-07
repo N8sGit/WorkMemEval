@@ -202,10 +202,10 @@ class ContextWindowManager:
         # Fallback: estimate based on action trace
         if hasattr(agent, 'action_tracer') and agent.action_tracer:
             trace = agent.get_behavioral_trace()
-            if trace and trace.checkpoints:
+            if trace and trace.checkpoint_traces:
                 # Rough estimation: 100 tokens per action + 500 per checkpoint
-                total_actions = sum(len(cp.actions) for cp in trace.checkpoints.values())
-                return (total_actions * 100) + (len(trace.checkpoints) * 500)
+                total_actions = sum(len(cp.actions) for cp in trace.checkpoint_traces)
+                return (total_actions * 100) + (len(trace.checkpoint_traces) * 500)
         
         # Very rough fallback
         return 2000
@@ -411,8 +411,9 @@ class ContextWindowManager:
         # Analyze action trace for repeated file access patterns
         if hasattr(agent, 'get_behavioral_trace'):
             trace = agent.get_behavioral_trace()
-            if trace and trace.checkpoints:
-                for checkpoint_id, checkpoint_trace in trace.checkpoints.items():
+            if trace and trace.checkpoint_traces:
+                for checkpoint_trace in trace.checkpoint_traces:
+                    checkpoint_id = checkpoint_trace.checkpoint_id
                     file_accesses = {}
                     
                     for action in checkpoint_trace.actions:
