@@ -526,6 +526,7 @@ class TaskSpecification:
     )
 
     # Enhanced system (optional, enables enhanced mode)
+    working_history: List[Dict[str, Any]] = field(default_factory=list)
     memory_probes: List[MemoryProbe] = field(default_factory=list)
     context_conditions: List[ContextWindowCondition] = field(default_factory=list)
     enhanced_complexity: Optional[EnhancedComplexityProfile] = None
@@ -761,6 +762,7 @@ class TaskSpecification:
                 }
                 for cp in self.checkpoints
             ],
+            "working_history": self.working_history,
             "planning_phase": {
                 "overview_prompt": self.planning_phase.overview_prompt,
                 "planning_deliverables": self.planning_phase.planning_deliverables,
@@ -1039,6 +1041,7 @@ class TaskSpecification:
             domain=data["domain"],
             description=data["description"],
             checkpoints=checkpoints,
+            working_history=data.get("working_history", []),
             planning_phase=planning_phase,
             repository=repository,
             memory_challenges=memory_challenges,

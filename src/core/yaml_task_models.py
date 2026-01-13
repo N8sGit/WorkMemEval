@@ -190,6 +190,8 @@ class YAMLTaskSpecification(BaseModel):
     
     # Execution details
     checkpoints: List[YAMLCheckpoint] = Field(..., description="Execution checkpoints")
+    working_history: List[Dict[str, Any]] = Field(default_factory=list, description="Pre-existing context/history to inject (inline)")
+    history_file: Optional[str] = Field(None, description="Path to a JSON or YAML file containing pre-existing context")
     planning_phase: Optional[YAMLPlanningPhase] = Field(None, description="Planning phase configuration")
     repository: Optional[YAMLRepository] = Field(None, description="Repository template configuration")
     
@@ -270,8 +272,12 @@ class YAMLTaskSpecification(BaseModel):
         
         return self
 
-    def to_task_specification(self) -> 'TaskSpecification':
-        """Convert YAML specification to executable TaskSpecification"""
+    def to_task_specification(self, base_path: Optional[Path] = None) -> 'TaskSpecification':
+        """Convert YAML specification to executable TaskSpecification.
+        
+        Args:
+            base_path: Optional directory to resolve relative paths (e.g. history_file)
+        """
         from .task_specification import (
             TaskSpecification, CheckpointSpecification, 
             PlanningPhase, RepositoryTemplate,
@@ -322,7 +328,7 @@ class YAMLTaskSpecification(BaseModel):
         exec_probes = []
         for p in self.memory_probes:
             # Safe string conversion of probe type
-            p_type_str = str(p.type)
+            p_type_str = str(p.type).lower()
             
             # Default to N_BACK_INTEGRATION
             target_probe_type = ProbeType.N_BACK_INTEGRATION
@@ -369,12 +375,40 @@ class YAMLTaskSpecification(BaseModel):
         domain_str = str(self.domain)
         difficulty_str = str(self.difficulty)
         
+        # Convert history (merge inline and file-based)
+        combined_history = list(self.working_history)
+        if self.history_file:
+            history_path = Path(self.history_file)
+            
+            # If not absolute, try resolving relative to base_path
+            if not history_path.is_absolute() and base_path:
+                history_path = base_path / history_path
+            
+            if history_path.exists():
+                try:
+                    with open(history_path, 'r') as f:
+                        if history_path.suffix.lower() == '.json':
+                            import json
+                            file_history = json.load(f)
+                        else:
+                            file_history = yaml.safe_load(f)
+                        
+                        if isinstance(file_history, list):
+                            combined_history.extend(file_history)
+                        else:
+                            print(f"Warning: history_file {self.history_file} did not contain a list")
+                except Exception as e:
+                    print(f"Warning: failed to load history_file {self.history_file}: {e}")
+            else:
+                print(f"Warning: history_file not found at {history_path}")
+
         task_spec = TaskSpecification(
             task_id=self.task_id,
             title=self.title,
             domain=domain_str,
             description=self.description,
             checkpoints=exec_checkpoints,
+            working_history=combined_history,
             planning_phase=exec_planning,
             repository=exec_repo,
             memory_probes=exec_probes,
