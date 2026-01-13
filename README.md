@@ -129,7 +129,7 @@ Use this only if you need to debug locally without Docker. It’s less isolated.
 
 ```
 # Run a single test directly (network disabled by default)
-docker compose -f docker/compose.dev.yml run --rm eval "pytest -q /workspace/tests/test_calculator_cp1.py"
+docker compose -f docker/compose.dev.yml run --rm eval python3 -m pytest -q /workspace/tests/test_calculator_cp1.py
 ```
 
 ### Outputs
