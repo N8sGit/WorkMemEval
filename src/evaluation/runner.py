@@ -8,6 +8,7 @@ agent coordination, and result collection.
 import json
 import shutil
 import time
+import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -49,7 +50,7 @@ class TaskSpecificationLoader:
             if task_path.suffix.lower() in ['.yaml', '.yml']:
                 from ..core.yaml_task_loader import load_yaml_task
                 yaml_spec = load_yaml_task(task_path, strict_mode=False)
-                task_spec = yaml_spec.to_task_specification()
+                task_spec = yaml_spec.to_task_specification(base_path=task_path.parent)
                 
                 # Auto-enable enhanced mode for YAML tasks since they are modern
                 task_spec.enable_enhanced_mode()
@@ -363,7 +364,8 @@ class BasicWorkMemEvalRunner:
             agent.initialize_secure_file_ops(working_directory)
 
         # Store initial task context (delegate to agent)
-        agent._store_task_context(task_spec)
+        if hasattr(agent, "_store_task_context"):
+            agent._store_task_context(task_spec)
 
         # Track per-checkpoint results
         checkpoint_results: List[CheckpointResult] = []
@@ -528,7 +530,8 @@ class BasicWorkMemEvalRunner:
             agent.initialize_secure_file_ops(working_directory)
 
         # Store initial task context (delegate to agent)
-        agent._store_task_context(task_spec)
+        if hasattr(agent, "_store_task_context"):
+            agent._store_task_context(task_spec)
 
         # Track per-checkpoint results
         checkpoint_results: List[CheckpointResult] = []
@@ -745,13 +748,31 @@ class BasicWorkMemEvalRunner:
         self, template_name: str, working_directory: Path
     ) -> None:
         """Copy template directory into working directory.
-        Looks for templates/{template_name} under current working directory.
+        Looks for templates in several locations:
+        1. templates/{template_name} under current working directory
+        2. /app/templates/{template_name} (Docker)
+        3. ../../templates/{template_name} relative to this file
         """
-        templates_root = Path.cwd() / "templates"
-        src = templates_root / template_name
-        if not src.exists():
-            raise FileNotFoundError(f"Template not found: {src}")
+        # Potential template roots
+        roots = [
+            Path.cwd() / "templates",
+            Path("/app/templates"),
+            Path(__file__).parent.parent.parent / "templates"
+        ]
+        
+        src = None
+        for root in roots:
+            candidate = root / template_name
+            if candidate.exists():
+                src = candidate
+                break
+        
+        if not src:
+            raise FileNotFoundError(f"Template '{template_name}' not found in any searched locations: {[str(r) for r in roots]}")
+
+        print(f"Materializing template from {src} to {working_directory}")
         # Copy contents of src into working_directory
+        copied_count = 0
         for path in src.rglob("*"):
             rel = path.relative_to(src)
             dest = working_directory / rel
@@ -760,22 +781,230 @@ class BasicWorkMemEvalRunner:
             else:
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(path, dest)
+                copied_count += 1
 
     def _calculate_basic_metrics(self, task_trace: TaskTrace) -> Dict[str, float]:
         """
-        Calculate working memory metrics using the metrics module.
+        Calculate basic working memory metrics from trace data.
         """
-        try:
-            from ..evaluation import metrics
+        # Placeholder for basic metrics
+        return {
+            "action_count": len(task_trace.actions),
+            "checkpoints_attempted": len(task_trace.checkpoints),
+        }
 
-            task_spec = (
-                self.current_evaluation.get("task_spec")
-                if self.current_evaluation
-                else None
-            )
-            if task_spec is None:
-                return {}
-            return metrics.compute_all_metrics(task_spec, task_trace)
-        except Exception:
-            # Fallback to empty metrics on failure
-            return {}
+
+class AgentifiedRunner:
+    """
+    Runner for the Agentified Architecture.
+    Orchestrates the A2A message loop between Assessor and Assessee.
+    """
+    def __init__(self):
+        self.task_loader = TaskSpecificationLoader()
+
+    async def run_evaluation(
+        self,
+        task_path: Path,
+        agent: AgentImplementation,
+        memory_system: MemorySystem,
+        working_directory: Optional[Path] = None,
+    ) -> EvaluationResult:
+        # 1. Setup
+        task_spec = self.task_loader.load_task(task_path)
+        
+        if working_directory is None:
+            working_directory = Path.cwd() / "evaluation_workspace" / task_spec.task_id
+        
+        # Ensure clean workspace
+        if working_directory.exists():
+            shutil.rmtree(working_directory)
+        working_directory.mkdir(parents=True)
+
+        # Materialize template if needed
+        if hasattr(task_spec.repository, 'template_name') and task_spec.repository.template_name:
+             self._materialize_repository(task_spec.repository.template_name, working_directory)
+
+        # 2. Initialize Agents
+        from ..agents.assessor import AssessorAgent
+        from ..agents.adapter import AssesseeAdapter
+        from ..core.a2a import MessageType
+        
+        tracer = ActionTracer(task_id=task_spec.task_id)
+        assessor = AssessorAgent(task_spec, working_directory)
+        
+        # Initialize agent context
+        if hasattr(agent, "initialize_secure_file_ops"):
+            agent.initialize_secure_file_ops(working_directory)
+            
+        if hasattr(agent, "_store_task_context"):
+            agent._store_task_context(task_spec)
+        
+        # Wrap user agent
+        assessee = AssesseeAdapter(agent, agent_name=agent.__class__.__name__)
+        
+        # 3. Execution Loop
+        start_time = time.time()
+        print(f"--- STARTING AGENTIFIED EVALUATION: {task_spec.title} ---")
+        
+        current_message = assessor.initialize_session(tracer)
+        
+        max_turns = 100 # Safety limit
+        turn = 0
+        task_success = False
+        task_finished = False
+        failure_reason = None
+        
+        while turn < max_turns:
+            turn += 1
+            
+            # 1. Send Message to Agent (if pending)
+            if current_message:
+                print(f"Runner -> Agent: {current_message.type} ({current_message.payload.keys()})")
+                try:
+                    response = await assessee.process_message(current_message)
+                    if response:
+                        print(f"Agent -> Runner (Sync): {response.type}")
+                        # Synchronous response (e.g. PROBE_RESPONSE)
+                        # Immediately process with Assessor
+                        current_message = assessor.process_message(response)
+                    else:
+                        # Message consumed / Async operation started
+                        current_message = None
+                except Exception as e:
+                    failure_reason = f"Agent crashed processing message: {e}"
+                    print(f"❌ Agent Error: {e}")
+                    break
+
+            # 2. Check for Agent Output (Async)
+            # Drain outbox or wait a bit if we are idle
+            if not assessee.outbox.empty():
+                while not assessee.outbox.empty():
+                    msg = await assessee.outbox.get()
+                    print(f"Agent (Async) -> Runner: {msg.type}")
+                    
+                    if msg.type == MessageType.TASK_COMPLETE:
+                         print("Received TASK_COMPLETE from Agent")
+                         # Finalize
+                         assessor.process_message(msg) # Let assessor calculate scores
+                         task_success = True # Tentative, assessor decides real success
+                         break
+                    
+                    # Send to Assessor
+                    result_msg = assessor.process_message(msg)
+                    print(f"Assessor -> Runner: {result_msg.type}")
+                    
+                    if result_msg.type == MessageType.TASK_COMPLETE:
+                        print("Assessor declared TASK_COMPLETE")
+                        task_finished = True
+                        break
+
+                    # The result becomes the next message for the agent
+                    current_message = result_msg
+                    
+                if task_finished:
+                    break
+            
+            else:
+                # If we have no message to send AND no output from agent, wait
+                if current_message is None:
+                    await asyncio.sleep(0.05)
+
+
+        # 4. Collect Results
+        execution_time = time.time() - start_time
+        
+        # Get Pillar Scores from Assessor
+        pillar_scores = {}
+        # We can extract them from the last message or Assessor state
+        # AssessorAgent.pillar_scores is available
+        for pillar, stats in assessor.pillar_scores.items():
+            if stats["total"] > 0:
+                pillar_scores[pillar.value] = stats["hits"] / stats["total"]
+            else:
+                pillar_scores[pillar.value] = 0.0
+
+        # Construct EvaluationResult
+        task_trace = tracer.get_task_trace()
+        checkpoint_results = []
+        
+        for cp_trace in task_trace.checkpoint_traces:
+            # Calculate duration
+            duration = 0.0
+            if cp_trace.end_timestamp and cp_trace.start_timestamp:
+                duration = cp_trace.end_timestamp - cp_trace.start_timestamp
+            elif cp_trace.completion_duration_ms:
+                duration = cp_trace.completion_duration_ms / 1000.0
+                
+            # Get file accesses
+            files_accessed = list(cp_trace.get_file_access_pattern().keys())
+            
+            # Get errors
+            errors = [e.metadata.get("error_message", "Unknown error") for e in cp_trace.errors_encountered]
+            
+            checkpoint_results.append(CheckpointResult(
+                checkpoint_id=cp_trace.checkpoint_id,
+                completed_successfully=cp_trace.tests_passed,
+                execution_time_seconds=duration,
+                tests_passed=cp_trace.tests_passed,
+                actions_taken=len(cp_trace.actions),
+                files_accessed=files_accessed,
+                errors_encountered=errors
+            ))
+        
+        # Determine final success: Task must finish AND all checkpoints must pass
+        all_checkpoints_passed = len(checkpoint_results) > 0 and all(cp.completed_successfully for cp in checkpoint_results)
+        final_success = task_finished and all_checkpoints_passed
+        
+        return EvaluationResult(
+            task_id=task_spec.task_id,
+            agent_name=agent.__class__.__name__,
+            memory_system_name=memory_system.__class__.__name__,
+            task_completed_successfully=final_success,
+            execution_time_seconds=execution_time,
+            task_trace=task_trace,
+            checkpoint_results=checkpoint_results,
+            working_memory_metrics={},
+            pillar_scores=pillar_scores,
+            failure_reason=failure_reason
+        )
+
+    def _materialize_repository(
+        self, template_name: str, working_directory: Path
+    ) -> None:
+        """Copy template directory into working directory.
+        Looks for templates in several locations:
+        1. templates/{template_name} under current working directory
+        2. /app/templates/{template_name} (Docker)
+        3. ../../templates/{template_name} relative to this file
+        """
+        # Potential template roots
+        roots = [
+            Path.cwd() / "templates",
+            Path("/app/templates"),
+            Path(__file__).parent.parent.parent / "templates"
+        ]
+        
+        src = None
+        for root in roots:
+            candidate = root / template_name
+            if candidate.exists():
+                src = candidate
+                break
+        
+        if not src:
+            print(f"Warning: Template '{template_name}' not found in any searched locations: {[str(r) for r in roots]}")
+            return
+
+        print(f"DEBUG: Materializing template from {src} to {working_directory}")
+        # Copy contents of src into working_directory
+        copied_count = 0
+        for path in src.rglob("*"):
+            rel = path.relative_to(src)
+            dest = working_directory / rel
+            if path.is_dir():
+                dest.mkdir(parents=True, exist_ok=True)
+            else:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, dest)
+                copied_count += 1
+        print(f"DEBUG: Materialized {copied_count} files from template")

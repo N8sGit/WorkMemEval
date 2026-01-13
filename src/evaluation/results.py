@@ -88,6 +88,9 @@ class EvaluationResult:
 
     # Working memory metrics (basic for now)
     working_memory_metrics: Dict[str, float] = field(default_factory=dict)
+    
+    # Pillar-specific scores (Explicit Memory Evaluation)
+    pillar_scores: Dict[str, float] = field(default_factory=dict)
 
     # Error information
     failure_reason: Optional[str] = None
@@ -170,6 +173,15 @@ class EvaluationResult:
         )
         total = len(self.checkpoint_results)
         print(f"Checkpoints: {completed}/{total} completed")
+
+        # Pillar Scores (Memory Efficiency)
+        if self.pillar_scores:
+            print("\nMemory Pillar Scores:")
+            for pillar, score in self.pillar_scores.items():
+                # Format likely keys: memory_fidelity, contextual_relevance, behavioral_integrity
+                name = pillar.replace("_", " ").title()
+                bar = "█" * int(score * 10) + "░" * (10 - int(score * 10))
+                print(f"  {name:<25} {bar} {score:.1%}")
 
         # Working memory metrics
         if self.working_memory_metrics:

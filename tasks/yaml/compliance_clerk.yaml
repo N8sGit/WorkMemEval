@@ -78,3 +78,7 @@ memory_probes:
     trigger_at_minute: 20
     description: "The memo raises the receipt limit for NYC. The agent must apply this change instantly."
     requirement_change: "New memo updates NYC meal limit and banned Lyft."
+
+evaluation_config:
+  max_duration_minutes: 30
+  track_context_usage: true

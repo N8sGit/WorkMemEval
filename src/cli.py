@@ -14,33 +14,70 @@ Usage examples:
 import argparse
 import asyncio
 import json
+import logging
 from pathlib import Path
 from typing import List
 
 from .agents.reference_agent import ReferenceWorkMemAgent
+from .core.plugin_loader import PluginLoader, PluginConfig
 from .evaluation.results import ComparisonResult, EvaluationResult
-from .evaluation.runner import BasicWorkMemEvalRunner
+from .evaluation.runner import BasicWorkMemEvalRunner, AgentifiedRunner
 from .memory import SimpleContextMemory
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(name)s - %(levelname)s - %(message)s'
+    )
+    
     task_path = Path(args.task)
     working_directory = Path(args.workspace) if args.workspace else None
 
+    # Load configuration for agent if provided
+    agent_config = {}
+    if args.agent_config:
+        try:
+            agent_config = json.loads(args.agent_config)
+        except json.JSONDecodeError as e:
+            print(f"Error parsing agent config JSON: {e}")
+            return 1
+
     memory = SimpleContextMemory({"max_items": 100})
-    agent = ReferenceWorkMemAgent(
-        memory,
-        {
+
+    if args.agent:
+        # Use plugin loader for custom agent
+        loader = PluginLoader()
+        try:
+            print(f"Loading custom agent: {args.agent}")
+            agent = loader.load_agent(
+                PluginConfig(class_path=args.agent, config=agent_config),
+                memory_system=memory
+            )
+        except Exception as e:
+            print(f"Failed to load agent {args.agent}: {e}")
+            import traceback
+            traceback.print_exc()
+            return 1
+    else:
+        # Default to ReferenceWorkMemAgent
+        default_config = {
             "max_iterations": 10,
             "memory_context_limit": 5,
             "llm_config": {"response_delay": 0.0},
-        },
-    )
+        }
+        # Merge provided config with default if any
+        default_config.update(agent_config)
+        
+        agent = ReferenceWorkMemAgent(
+            memory,
+            default_config,
+        )
 
-    runner = BasicWorkMemEvalRunner(
-        containerized=getattr(args, "container", False),
-        docker_image=getattr(args, "docker_image", None),
-    )
+    # Use the new Agentified Architecture by default
+    print("Initializing Agentified Runner (Assessor-Driven Evaluation)...")
+    runner = AgentifiedRunner()
 
     async def _run():
         result = await runner.run_evaluation(
@@ -107,6 +144,14 @@ def main(argv: List[str] | None = None) -> int:
         "--docker-image",
         default="workmemeval/eval:local",
         help="Docker image to use when running containerized",
+    )
+    p_run.add_argument(
+        "--agent",
+        help="Custom agent class path (e.g. module.submodule:ClassName)",
+    )
+    p_run.add_argument(
+        "--agent-config",
+        help="JSON string configuration for the agent",
     )
     p_run.set_defaults(func=cmd_run, container=True)
 
