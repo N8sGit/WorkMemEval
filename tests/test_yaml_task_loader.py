@@ -35,6 +35,16 @@ class TestYAMLTaskModels:
             "domain": "distributed_systems",
             "difficulty": "intermediate",
             "description": "This is a test task description that is long enough to pass validation requirements.",
+            "checkpoints": [
+                {
+                    "id": "cp1",
+                    "title": "Checkpoint 1",
+                    "order": 1,
+                    "stub_file": "src/main.py",
+                    "requirements": "Implement the main function",
+                    "test_file": "tests/test_main.py"
+                }
+            ],
             "memory_dimensions": {
                 "information_density": 500,
                 "temporal_span": 30,
@@ -181,6 +191,14 @@ description: |
   Implement a distributed caching system that handles node failures gracefully.
   The system should support consistent hashing, replication, and automatic failover.
   
+checkpoints:
+  - id: cp1
+    title: Initial Setup
+    order: 1
+    stub_file: cache.py
+    requirements: "Setup basic cache structure"
+    test_file: tests/test_cache.py
+
 memory_dimensions:
   information_density: 600  # Within intermediate range (300-800)
   temporal_span: 45
@@ -269,7 +287,7 @@ success_criteria:
         incomplete_yaml = """
 task_id: test_task
 title: Test Task
-# Missing domain, difficulty, description, memory_dimensions, success_criteria
+# Missing domain, difficulty, description, memory_dimensions, success_criteria, checkpoints
 """
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
@@ -319,6 +337,13 @@ title: Warning Test Task
 domain: distributed_systems
 difficulty: beginner
 description: This task has complexity that doesn't match its beginner difficulty level.
+checkpoints:
+  - id: cp1
+    title: Simple Task
+    order: 1
+    stub_file: main.py
+    requirements: "Do something simple"
+    test_file: tests/test_main.py
 memory_dimensions:
   information_density: 1500  # Too high for beginner
   temporal_span: 120         # Too long for beginner
@@ -366,6 +391,13 @@ title: Convenience Function Test
 domain: web_services
 difficulty: beginner
 description: Simple task to test the convenience function for loading YAML tasks.
+checkpoints:
+  - id: cp1
+    title: Simple Task
+    order: 1
+    stub_file: main.py
+    requirements: "Do something simple"
+    test_file: tests/test_main.py
 memory_dimensions:
   information_density: 300  # Within beginner range but meets web_services minimum
   temporal_span: 25         # Meets web_services minimum

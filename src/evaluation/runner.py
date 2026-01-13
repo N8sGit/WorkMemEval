@@ -789,8 +789,8 @@ class BasicWorkMemEvalRunner:
         """
         # Placeholder for basic metrics
         return {
-            "action_count": len(task_trace.actions),
-            "checkpoints_attempted": len(task_trace.checkpoints),
+            "action_count": float(task_trace.total_actions),
+            "checkpoints_attempted": float(len(task_trace.checkpoint_traces)),
         }
 
 

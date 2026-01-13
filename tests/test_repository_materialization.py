@@ -10,7 +10,8 @@ from src.evaluation.runner import BasicWorkMemEvalRunner, TaskSpecificationLoade
 
 def test_loader_parses_repository_and_planning(tmp_path: Path):
     # Copy the existing task JSON to a temp dir
-    repo_root = Path.cwd()
+    import src
+    repo_root = Path(src.__file__).parent.parent
     src_task = repo_root / "tasks" / "calculator_demo.json"
     dst_task = tmp_path / "task.json"
     dst_task.write_text(src_task.read_text())
@@ -25,6 +26,7 @@ def test_loader_parses_repository_and_planning(tmp_path: Path):
 def test_materialize_repository(tmp_path: Path):
     # Materialize the calculator_demo template
     runner = BasicWorkMemEvalRunner()
+    # The runner expects templates to be in the root templates directory
     runner._materialize_repository("calculator_demo", tmp_path)
 
     # Verify expected files exist
