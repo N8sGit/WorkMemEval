@@ -3,8 +3,8 @@
 Unit tests for FileSystemWatcher snapshot and diff behavior.
 """
 
-from pathlib import Path
 import time
+from pathlib import Path
 
 from src.evaluation.monitoring import FileSystemWatcher
 
@@ -40,4 +40,3 @@ def test_filesystem_watcher_snapshot_and_diff(tmp_path: Path):
     after_delete = watcher.snapshot(tmp_path)
     delta3 = watcher.diff(after_modify, after_delete)
     assert str(f2) in delta3["deleted"]
-

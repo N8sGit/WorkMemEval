@@ -1,0 +1,59 @@
+task_id: distributed_cache_001
+title: Distributed Cache Implementation
+domain: distributed_systems
+difficulty: intermediate
+description: |
+  Implement a distributed caching system that handles node failures gracefully.
+  The system should support consistent hashing, replication, and automatic failover.
+  
+  Requirements:
+  - Consistent hashing for key distribution
+  - Configurable replication factor (default: 3)
+  - Automatic failover when nodes become unavailable
+  - Performance monitoring and metrics collection
+  - Configuration management for cluster settings
+
+memory_dimensions:
+  information_density: 600    # Critical information tokens to retain
+  temporal_span: 45          # Minutes of sustained attention required
+  context_switches: 3        # Number of major context shifts
+  dependency_depth: 4        # Levels of interdependent concepts
+  
+success_criteria:
+  - "Cache operations (GET/PUT/DELETE) must work correctly under normal conditions"
+  - "System must handle node failures without data loss"
+  - "Performance must degrade gracefully under increasing load"
+  - "Configuration must be maintainable and well-documented"
+  - "Code must include appropriate error handling and logging"
+
+memory_probes:
+  - type: n_back_recall
+    trigger_at_minute: 25
+    target_information: initial_architecture_decisions
+    description: "Recall the key architectural decisions made in the first 10 minutes"
+    
+  - type: context_switch
+    trigger_at_minute: 30
+    interruption_task: debug_authentication_service_issue
+    duration_minutes: 8
+    description: "Handle unrelated debugging task, then resume cache implementation"
+    
+  - type: specification_drift
+    trigger_at_minute: 35
+    requirement_change: add_encryption_requirement
+    description: "Add requirement for data encryption in transit and at rest"
+
+evaluation_config:
+  max_duration_minutes: 60
+  context_window_limit: 8192  # Optional: force context constraints
+  allow_external_memory: true
+  track_context_usage: true
+
+tags:
+  - distributed_systems
+  - caching
+  - fault_tolerance
+  - intermediate_difficulty
+
+created_by: "WorkMemEval Team"
+version: "1.0"

@@ -6,14 +6,13 @@ Core interfaces and data structures for LLM integration.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
 from enum import Enum
-import time
-import asyncio
+from typing import Any, Dict, Optional
 
 
 class LLMProvider(Enum):
     """Supported LLM providers"""
+
     OPENAI = "openai"
     OPENROUTER = "openrouter"
 
@@ -21,6 +20,7 @@ class LLMProvider(Enum):
 @dataclass
 class LLMResponse:
     """Response from LLM provider"""
+
     content: str
     model: str
     usage: Dict[str, int] = field(default_factory=dict)
@@ -32,6 +32,7 @@ class LLMResponse:
 @dataclass
 class LLMConfig:
     """Configuration for LLM providers"""
+
     provider: LLMProvider
     model: str
     api_key: Optional[str] = None
@@ -43,16 +44,17 @@ class LLMConfig:
 
 class LLMInterface(ABC):
     """Abstract interface for Language Model providers"""
-    
+
     def __init__(self, config: LLMConfig):
         self.config = config
-        
+
     @abstractmethod
-    async def generate_response(self, prompt: str, 
-                              context: Optional[Dict[str, Any]] = None) -> LLMResponse:
+    async def generate_response(
+        self, prompt: str, context: Optional[Dict[str, Any]] = None
+    ) -> LLMResponse:
         """Generate a response from the LLM"""
         pass
-    
+
     @abstractmethod
     def get_provider_info(self) -> Dict[str, Any]:
         """Get information about the LLM provider"""

@@ -28,6 +28,6 @@ COPY templates/ /app/templates/
 USER appuser:appgroup
 WORKDIR /workspace
 
-# Use a shell entrypoint to accept commands easily
-ENTRYPOINT ["/bin/sh", "-lc"]
+# Default command shows help
+CMD ["python3", "-m", "src.cli", "--help"]
 

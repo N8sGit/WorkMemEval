@@ -5,12 +5,12 @@ Executes pytest for a given test file within a working directory and returns
 structured results for integration into the evaluation harness.
 """
 
+import os
+import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
-import subprocess
-import time
-import os
 
 
 @dataclass
@@ -41,7 +41,7 @@ class PytestRunner:
             except ValueError:
                 # If we can't make it relative, keep it absolute
                 pass
-        
+
         cmd = ["pytest", "-q", str(test_path)]
         start = time.time()
         try:
@@ -51,7 +51,7 @@ class PytestRunner:
             current_pythonpath = env.get("PYTHONPATH", "")
             env["PYTHONPATH"] = f".:{current_pythonpath}" if current_pythonpath else "."
 
-            proc = subprocess.run(
+            proc = subprocess.run(  # nosec B603
                 cmd,
                 cwd=str(cwd),
                 capture_output=True,
@@ -60,7 +60,7 @@ class PytestRunner:
                 env=env,
             )
             duration = time.time() - start
-            stdout_tail = (proc.stdout or "")[-self.tail_chars:]
+            stdout_tail = (proc.stdout or "")[-self.tail_chars :]
             stderr = proc.stderr or ""
             passed = proc.returncode == 0
 
@@ -86,7 +86,6 @@ class PytestRunner:
                 passed=False,
                 duration_s=duration,
                 exit_code=124,
-                stdout_tail=stdout_tail[-self.tail_chars:],
+                stdout_tail=stdout_tail[-self.tail_chars :],
                 errors=["Test run timed out"],
             )
-

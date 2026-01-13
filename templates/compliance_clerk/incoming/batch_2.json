@@ -1,0 +1,26 @@
+[
+    {
+        "id": "exp_201",
+        "category": "meal",
+        "amount": 90.00,
+        "location": "Austin",
+        "date": "2024-01-19",
+        "day_of_week": "Friday",
+        "has_receipt": false,
+        "description": "Team lunch celebration"
+    },
+    {
+        "id": "exp_202",
+        "category": "office_supplies",
+        "amount": 150.00,
+        "manager_approval": false,
+        "description": "New chair"
+    },
+    {
+        "id": "exp_203",
+        "category": "office_supplies",
+        "amount": 150.00,
+        "manager_approval": true,
+        "description": "Monitor"
+    }
+]

@@ -1,0 +1,34 @@
+task_id: history_demo
+title: History Injection Demo
+domain: data_processing
+difficulty: beginner
+description: |
+  This task demonstrates the pre-existing history injection feature. 
+  The agent starts with a working history that contains critical instructions 
+  not present in the prompt.
+repository:
+  template_name: calculator_demo
+memory_dimensions:
+  information_density: 300
+  temporal_span: 15
+  context_switches: 1
+  dependency_depth: 1
+success_criteria:
+  - "The agent must follow the secret instructions from history"
+  - "The agent should correctly implement the basic math functions"
+  - "The agent will demonstrate successful history retrieval"
+working_history:
+  - role: user
+    content: "IMPORTANT: For this task, all addition results must be incremented by 100. This is a special secret requirement."
+checkpoints:
+  - id: cp1_addition
+    title: "Implement Addition with Secret"
+    order: 1
+    stub_file: "calculator.py"
+    test_file: "tests/test_calculator_cp1.py"
+    requirements: |
+      Implement the 'add' function in calculator.py. 
+      Check your history for any special constraints.
+evaluation_config:
+  max_duration_minutes: 30
+  track_context_usage: true

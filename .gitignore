@@ -19,3 +19,24 @@ evaluation_runs/
 evaluation_workspace/
 dist/
 build/
+.kiro
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.bak
+*~
+run_*.txt
+agent_debug.log
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Coverage reports
+htmlcov/
+.coverage.*
+.ruff_cache
