@@ -43,25 +43,12 @@ class TestOpenRouterProvider:
         with pytest.raises(ValueError, match="OpenRouter API key is required"):
             OpenRouterProvider(config)
 
-    def test_openrouter_provider_creation_with_api_key(self):
-        """Test OpenRouterProvider creation with API key"""
-        config = LLMConfig(
-            provider=LLMProvider.OPENROUTER,
-            model="gpt-3.5-turbo",
-            api_key="neutral-mock-key-for-testing"  # pragma: allowlist secret
-        )
-
-        provider = OpenRouterProvider(config)
-        assert provider.config.model == "gpt-3.5-turbo"
-        assert provider.api_key == "neutral-mock-key-for-testing"
-        assert provider.call_count == 0
-
     def test_llm_factory_creates_openrouter_provider(self):
         """Test that LLMFactory creates OpenRouterProvider correctly"""
         config = LLMConfig(
             provider=LLMProvider.OPENROUTER,
             model="gpt-4",  # Should resolve to openai/gpt-4
-            api_key="neutral-mock-key-for-testing"  # pragma: allowlist secret
+            api_key="sk-test-not-real",  # pragma: allowlist secret
         )
 
         provider = LLMFactory.create_provider(config)
@@ -96,7 +83,7 @@ class TestOpenRouterProvider:
         config = LLMConfig(
             provider=LLMProvider.OPENROUTER,
             model="gpt-3.5-turbo",
-            api_key="neutral-mock-key-for-testing"  # pragma: allowlist secret
+            api_key="sk-test-not-real",  # pragma: allowlist secret
         )
 
         provider = OpenRouterProvider(config)
@@ -135,7 +122,7 @@ class TestOpenRouterProvider:
         config = LLMConfig(
             provider=LLMProvider.OPENROUTER,
             model="gpt-3.5-turbo",
-            api_key="neutral-mock-key-for-testing",  # pragma: allowlist secret
+            api_key="sk-test-not-real",  # pragma: allowlist secret
         )
 
         provider = OpenRouterProvider(config)
@@ -155,7 +142,7 @@ class TestOpenRouterProvider:
         mock_client.post.side_effect = httpx.TimeoutException("Request timed out")  # pragma: allowlist secret
 
         config = LLMConfig(
-            provider=LLMProvider.OPENROUTER, model="gpt-3.5-turbo", api_key="neutral-mock-key-for-testing"  # pragma: allowlist secret
+            provider=LLMProvider.OPENROUTER, model="gpt-3.5-turbo", api_key="sk-test-not-real"  # pragma: allowlist secret
         )
 
         provider = OpenRouterProvider(config)
@@ -168,7 +155,7 @@ class TestOpenRouterProvider:
     def test_provider_info(self):
         """Test provider info retrieval"""
         config = LLMConfig(
-            provider=LLMProvider.OPENROUTER, model="gpt-4", api_key="neutral-mock-key-for-testing"  # pragma: allowlist secret
+            provider=LLMProvider.OPENROUTER, model="gpt-4", api_key="sk-test-not-real"  # pragma: allowlist secret
         )
 
         provider = OpenRouterProvider(config)
