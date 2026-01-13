@@ -30,6 +30,8 @@ build/
 *.tmp
 *.bak
 *~
+run_*.txt
+agent_debug.log
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
