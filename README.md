@@ -259,7 +259,7 @@ Use the `--agent` flag to point to your class using Python module path syntax (`
 python3 -m src.cli run \
   --task tasks/yaml/compliance_clerk.yaml \
   --agent my_project.my_agent:MyCustomAgent \
-  --agent-config '{"api_key": "sk-..."}'
+  --agent-config '{"api_key": "sk-..."}'  # pragma: allowlist secret
 ```
 
 The harness will dynamically load your class, instantiate it with the memory system, and run the evaluation.

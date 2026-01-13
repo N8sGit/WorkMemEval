@@ -33,7 +33,7 @@ jobs:
             -v "$PWD/evaluation_workspace/ci:/workspace:rw" \
             -v "$PWD:/app:ro" \
             workmemeval/eval:ci \
-            python3 -m pytest -q
+            python3 -m pytest -p no:cacheprovider -q
 
   pre-commit:
     runs-on: ubuntu-latest

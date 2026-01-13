@@ -128,14 +128,14 @@ class TestOpenRouterProvider:
         mock_response = MagicMock()
         mock_response.status_code = 401
         mock_response.text = "Unauthorized"
-        mock_response.json.return_value = {"error": {"message": "Invalid API key"}}
+        mock_response.json.return_value = {"error": {"message": "Invalid API key"}}  # pragma: allowlist secret
 
         mock_client.post.return_value = mock_response
 
         config = LLMConfig(
             provider=LLMProvider.OPENROUTER,
             model="gpt-3.5-turbo",
-            api_key="invalid-key",
+            api_key="invalid-key",  # pragma: allowlist secret
         )
 
         provider = OpenRouterProvider(config)
@@ -152,7 +152,7 @@ class TestOpenRouterProvider:
 
         mock_client = AsyncMock()
         mock_client_class.return_value = mock_client
-        mock_client.post.side_effect = httpx.TimeoutException("Request timed out")
+        mock_client.post.side_effect = httpx.TimeoutException("Request timed out")  # pragma: allowlist secret
 
         config = LLMConfig(
             provider=LLMProvider.OPENROUTER, model="gpt-3.5-turbo", api_key="test-key"
