@@ -48,7 +48,7 @@ class TestOpenRouterProvider:
         config = LLMConfig(
             provider=LLMProvider.OPENROUTER,
             model="gpt-3.5-turbo",
-            api_key="test-api-key",
+            api_key="test-api-key",  # pragma: allowlist secret
         )
 
         provider = OpenRouterProvider(config)
@@ -61,7 +61,7 @@ class TestOpenRouterProvider:
         config = LLMConfig(
             provider=LLMProvider.OPENROUTER,
             model="gpt-4",  # Should resolve to openai/gpt-4
-            api_key="test-api-key",
+            api_key="test-api-key",  # pragma: allowlist secret
         )
 
         provider = LLMFactory.create_provider(config)
@@ -96,7 +96,7 @@ class TestOpenRouterProvider:
         config = LLMConfig(
             provider=LLMProvider.OPENROUTER,
             model="gpt-3.5-turbo",
-            api_key="test-api-key",
+            api_key="test-api-key",  # pragma: allowlist secret
         )
 
         provider = OpenRouterProvider(config)
@@ -155,7 +155,7 @@ class TestOpenRouterProvider:
         mock_client.post.side_effect = httpx.TimeoutException("Request timed out")  # pragma: allowlist secret
 
         config = LLMConfig(
-            provider=LLMProvider.OPENROUTER, model="gpt-3.5-turbo", api_key="test-key"
+            provider=LLMProvider.OPENROUTER, model="gpt-3.5-turbo", api_key="test-key"  # pragma: allowlist secret
         )
 
         provider = OpenRouterProvider(config)

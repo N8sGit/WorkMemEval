@@ -51,7 +51,7 @@ class PytestRunner:
             current_pythonpath = env.get("PYTHONPATH", "")
             env["PYTHONPATH"] = f".:{current_pythonpath}" if current_pythonpath else "."
 
-            proc = subprocess.run(
+            proc = subprocess.run(  # nosec B603
                 cmd,
                 cwd=str(cwd),
                 capture_output=True,
