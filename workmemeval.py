@@ -162,74 +162,6 @@ It contradicts our established architecture.
     return 0
 
 
-def cmd_v1(args):
-    """Run V1 legacy evaluation (deprecated)."""
-    import warnings
-    warnings.warn(
-        "\n⚠️  DEPRECATION: V1 is legacy. Use 'workmemeval.py run' instead.\n",
-        DeprecationWarning,
-        stacklevel=2
-    )
-    
-    from src.core.task_specification import TaskSpecification
-    from src.core.action_trace import ActionTracer
-    from src.agents.assessor import AssessorAgent
-    from src.agents.adapter import AssesseeAdapter
-    from src.agents.reference_agent import ReferenceWorkMemAgent
-    from src.memory.context_memory import ContextMemorySystem
-    from src.evaluation.runner import TaskSpecificationLoader
-    import shutil
-    
-    workspace_path = Path(args.workspace)
-    if workspace_path.exists():
-        shutil.rmtree(workspace_path)
-    workspace_path.mkdir(parents=True)
-    
-    loader = TaskSpecificationLoader()
-    task_spec = loader.load_task(Path(args.task))
-    
-    tracer = ActionTracer(task_id=task_spec.task_id)
-    assessor = AssessorAgent(task_spec, workspace_path)
-    
-    memory_system = ContextMemorySystem({"max_items": 50})
-    agent_config = {
-        "llm_config": {"provider": "mock", "model": "test-model", "temperature": 0.0},
-        "use_secure_file_ops": True,
-        "working_directory": str(workspace_path)
-    }
-    user_agent = ReferenceWorkMemAgent(memory_system, agent_config)
-    assessee = AssesseeAdapter(user_agent, agent_name="RefAgent")
-    
-    print("--- STARTING V1 EVALUATION (LEGACY) ---")
-    
-    async def _run():
-        from src.core.a2a import MessageType
-        current_message = assessor.initialize_session(tracer)
-        
-        for turn in range(20):
-            response = await assessee.process_message(current_message)
-            
-            if response:
-                current_message = assessor.process_message(response)
-            elif not assessee.outbox.empty():
-                msg = await assessee.outbox.get()
-                current_message = assessor.process_message(msg)
-            else:
-                await asyncio.sleep(0.1)
-                continue
-            
-            if current_message.type == MessageType.TASK_COMPLETE:
-                print("Task complete.")
-                break
-            
-            await asyncio.sleep(0.01)
-        
-        print("--- V1 EVALUATION COMPLETE ---")
-    
-    asyncio.run(_run())
-    return 0
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="WorkMemEval: Working Memory Benchmark for AI Agents",
@@ -239,7 +171,6 @@ Examples:
   python workmemeval.py run --task shopmind          # Live LLM evaluation
   python workmemeval.py run --task extended          # 12-checkpoint stress test
   python workmemeval.py demo --task shopmind         # Mock agent test
-  python workmemeval.py v1 --task tasks/yaml/...     # Legacy V1 (deprecated)
 """
     )
     
@@ -264,14 +195,6 @@ Examples:
     demo_parser.add_argument("--failing", action="store_true",
                              help="Simulate a failing agent")
     demo_parser.set_defaults(func=cmd_demo)
-    
-    # v1: Legacy
-    v1_parser = subparsers.add_parser("v1", help="Run legacy V1 evaluation (deprecated)")
-    v1_parser.add_argument("--task", default="tasks/yaml/compliance_clerk.yaml",
-                           help="Task YAML file path")
-    v1_parser.add_argument("--workspace", default="workspace_test",
-                           help="Working directory")
-    v1_parser.set_defaults(func=cmd_v1)
     
     args = parser.parse_args()
     

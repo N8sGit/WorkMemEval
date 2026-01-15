@@ -482,12 +482,12 @@ history_file: "contexts/my_long_history.json"
 ### Local Execution (Development)
 
 ```bash
-# Basic run with mock LLM
-python3 -m src.cli run --task tasks/yaml/my_custom_task.yaml --no-container
+# Run your task (V2)
+python workmemeval.py run --task tasks/v2/my_task.yaml
 
-# With real LLM (requires OPENROUTER_API_KEY)
+# With a real LLM (requires OPENROUTER_API_KEY)
 export OPENROUTER_API_KEY=your-key-here
-python3 -m src.cli run --task tasks/yaml/my_custom_task.yaml --no-container --model claude-3.5-sonnet
+python workmemeval.py run --task tasks/v2/my_task.yaml --model anthropic/claude-3.5-sonnet
 ```
 
 ### Docker Execution (Production/Isolated)
@@ -498,7 +498,7 @@ docker compose -f docker/compose.dev.yml build
 
 # Run evaluation
 docker compose -f docker/compose.dev.yml run --rm eval \
-  python3 -m src.cli run --task tasks/yaml/my_custom_task.yaml
+  python workmemeval.py run --task tasks/v2/my_task.yaml
 ```
 
 ---
@@ -549,7 +549,7 @@ For tasks outside the repository:
 docker compose -f docker/compose.dev.yml run --rm \
   -v /absolute/path/to/my_tasks:/app/my_tasks:ro \
   -v /absolute/path/to/my_templates:/app/templates/my_templates:ro \
-  eval python3 -m src.cli run --task my_tasks/custom.yaml
+  eval python workmemeval.py run --task my_tasks/custom.yaml
 ```
 
 ---
@@ -591,7 +591,7 @@ source .env
 ```bash
 docker compose -f docker/compose.dev.yml run --rm \
   -e OPENROUTER_API_KEY=$OPENROUTER_API_KEY \
-  eval python3 -m src.cli run --task tasks/yaml/my_task.yaml --model claude-3.5-sonnet
+  eval python workmemeval.py run --task tasks/v2/my_task.yaml --model anthropic/claude-3.5-sonnet
 ```
 
 ---
@@ -734,7 +734,7 @@ evaluation_config:
 ```bash
 # Local with real LLM
 export OPENROUTER_API_KEY=your-key
-python3 -m src.cli run --task tasks/yaml/expense_auditor.yaml --no-container --model claude-3.5-sonnet
+python workmemeval.py run --task tasks/v2/expense_auditor.yaml --model anthropic/claude-3.5-sonnet
 ```
 
 Expected output:
