@@ -1,5 +1,6 @@
-# Container image for WorkMemEval evaluations (tests inside Docker)
-# NOTE: tag this locally as workmemeval/eval:local
+# WorkMemEval: Working Memory Benchmark for AI Agents
+# Build: docker compose -f docker/compose.dev.yml build
+# Run:   docker compose -f docker/compose.dev.yml run --rm eval
 
 FROM python:3.11-slim
 
@@ -7,27 +8,29 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-# Create non-root user
+# Create non-root user for security
 RUN addgroup --system --gid 10001 appgroup && \
-    adduser  --system --uid 10001 --ingroup appgroup --home /home/appuser appuser
+    adduser --system --uid 10001 --ingroup appgroup --home /home/appuser appuser
 
-# Work directories
 WORKDIR /app
-RUN mkdir -p /workspace && chown -R appuser:appgroup /workspace
 
-# Dependencies (pytest and tooling)
+# Create working directories
+RUN mkdir -p /app/evaluation_workspace /app/evaluation_runs && \
+    chown -R appuser:appgroup /app
+
+# Install dependencies
 COPY requirements/ /app/requirements/
-RUN python -m pip install --upgrade pip && \
+RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r /app/requirements/dev.txt
 
-# Copy source (mounted read-only at runtime as well)
+# Copy source code
 COPY src/ /app/src/
 COPY tasks/ /app/tasks/
 COPY templates/ /app/templates/
+COPY workmemeval.py /app/
 
+# Switch to non-root user
 USER appuser:appgroup
-WORKDIR /workspace
 
-# Default command shows help
-CMD ["python3", "-m", "src.cli", "--help"]
-
+# Default command
+CMD ["python", "workmemeval.py", "run", "--task", "shopmind"]
