@@ -149,6 +149,7 @@ def create_mock_agent(task):
 def create_default_agent(args):
     """Create the default agent (LLM-based if available)."""
     import os
+    from .llm_agent import OpenRouterAgent
     
     # Check for API key
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -158,14 +159,13 @@ def create_default_agent(args):
         return None
     
     if args.model:
-        # Create LLM-backed agent
+        # Create V2 LLM-backed agent
         try:
-            from ..agents.v2_agent import V2WorkMemAgent
-            return V2WorkMemAgent(model=args.model, api_key=api_key)
-        except ImportError:
-            print("Warning: V2WorkMemAgent not available")
+            return OpenRouterAgent(model=args.model, api_key=api_key)
+        except Exception as e:
+            print(f"Warning: Could not create OpenRouterAgent: {e}")
             return None
-    
+
     return None
 
 

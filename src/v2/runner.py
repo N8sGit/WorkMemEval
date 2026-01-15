@@ -29,10 +29,6 @@ except ImportError:
     SemanticAssessor = None
     SEMANTIC_AVAILABLE = False
 
-# Import secure file ops and docker runner from v1
-from ..agents.secure_file_ops import SecureFileOperations
-from ..evaluation.docker_test_runner import DockerTestRunner
-
 
 class AgentProtocol(Protocol):
     """Minimal interface for agents to implement."""
@@ -83,8 +79,8 @@ class V2Runner:
         self.use_container = use_container
         self.docker_image = docker_image
         self.secure_mode = secure_mode
-        self.docker_runner = DockerTestRunner(image=docker_image) if use_container else None
-        self.secure_file_ops: Optional[SecureFileOperations] = None
+        self.docker_runner = None
+        self.secure_file_ops = None
         
         # Initialize semantic assessor if enabled and available
         self.semantic_assessor = None
@@ -220,12 +216,7 @@ class V2Runner:
         if working_dir.exists():
             shutil.rmtree(working_dir)
         working_dir.mkdir(parents=True)
-        
-        # Initialize secure file operations if enabled
-        if self.secure_mode:
-            self.secure_file_ops = SecureFileOperations(working_dir)
-            print(f"  Secure file ops enabled (base: {working_dir})")
-        
+
         # Materialize template if provided
         if task.template:
             self._materialize_template(task.template, working_dir)
@@ -234,7 +225,6 @@ class V2Runner:
         if task.history_file:
             self._load_history(task.history_file, working_dir)
         
-        # Log container mode
         if self.use_container:
             print(f"  Container mode: {self.docker_image}")
     
