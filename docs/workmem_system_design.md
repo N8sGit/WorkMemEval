@@ -213,7 +213,7 @@ A minimal, backward-compatible path to YAML-first operation is:
      - Translates `memory_probes` and `evaluation_config` into enhanced runtime features.
 
 3. **Add an End-to-End YAML Test**
-   - Use `tasks/yaml/example_distributed_cache.yaml` as a canonical example.
+   - Use `tasks/simple_recall.yaml` as a canonical example.
    - Write a test that:
      - Loads this YAML.
      - Adapts it to `TaskSpecification`.

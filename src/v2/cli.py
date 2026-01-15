@@ -3,9 +3,9 @@
 WorkMemEval V2: Simple CLI
 
 Usage:
-  python -m src.v2.cli run tasks/v2/shopmind.yaml
-  python -m src.v2.cli run tasks/v2/simple_recall.yaml --agent mock
-  python -m src.v2.cli validate tasks/v2/shopmind.yaml
+  python -m src.v2.cli run tasks/shopmind.yaml
+  python -m src.v2.cli run tasks/simple_recall.yaml --agent mock
+  python -m src.v2.cli validate tasks/shopmind.yaml
 """
 
 import argparse

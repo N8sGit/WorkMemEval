@@ -39,10 +39,10 @@ def cmd_run(args):
         return 1
     
     task_paths = {
-        "simple": Path("tasks/v2/simple_recall.yaml"),
-        "shopmind": Path("tasks/v2/shopmind.yaml"),
-        "extended": Path("tasks/v2/shopmind_extended.yaml"),
-        "semantic": Path("tasks/v2/shopmind_semantic.yaml"),
+        "simple": Path("tasks/simple_recall.yaml"),
+        "shopmind": Path("tasks/shopmind.yaml"),
+        "extended": Path("tasks/shopmind_extended.yaml"),
+        "semantic": Path("tasks/shopmind_semantic.yaml"),
     }
     
     task_path = task_paths.get(args.task)
@@ -131,8 +131,8 @@ It contradicts our established architecture.
             return f"## Checkpoint {self.checkpoint_count}\nCompleted."
     
     task_paths = {
-        "simple": Path("tasks/v2/simple_recall.yaml"),
-        "shopmind": Path("tasks/v2/shopmind.yaml"),
+        "simple": Path("tasks/simple_recall.yaml"),
+        "shopmind": Path("tasks/shopmind.yaml"),
     }
     
     task_path = task_paths.get(args.task, Path(args.task))

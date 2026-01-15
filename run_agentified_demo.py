@@ -98,7 +98,7 @@ async def run_evaluation(task_path: str, workspace: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", default="tasks/yaml/compliance_clerk.yaml")
+    parser.add_argument("--task", default="tasks/shopmind.yaml")
     parser.add_argument("--workspace", default="workspace_test")
     args = parser.parse_args()
     

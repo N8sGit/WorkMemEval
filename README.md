@@ -117,7 +117,7 @@ WorkMemEval uses a simple but effective evaluation approach:
 ### Example Task Structure
 
 ```yaml
-# tasks/v2/shopmind.yaml
+# tasks/shopmind.yaml
 task_id: shopmind_continuation
 title: "ShopMind: Working Memory Evaluation"
 template: shopmind                              # Codebase in templates/
@@ -178,7 +178,7 @@ WorkMemEval/
 │   ├── assessor.py         # Pattern matching scorer
 │   ├── semantic_assessor.py # LLM-based semantic grading (optional)
 │   └── runner.py           # Checkpoint execution
-├── tasks/v2/               # Task definitions (YAML)
+├── tasks/                  # Task definitions (YAML)
 ├── templates/              # Codebase templates
 ├── contexts/               # Session history files
 └── evaluation_runs/        # Output results (JSON)
@@ -242,7 +242,7 @@ This provides a working baseline, but **we strongly encourage users to bring the
 ]
 ```
 
-2. **Create task YAML** in `tasks/v2/`:
+2. **Create task YAML** in `tasks/`:
 ```yaml
 task_id: my_task
 history_file: contexts/my_history.json

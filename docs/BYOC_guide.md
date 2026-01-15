@@ -12,7 +12,7 @@ V2 uses a simplified **Workpad Pattern** where tasks are defined in simple YAML 
 
 ```
 WorkMemEval/
-├── tasks/v2/
+├── tasks/
 │   └── my_task.yaml              # Task definition
 ├── templates/
 │   └── my_codebase/              # Optional: codebase to work on
@@ -47,7 +47,7 @@ Place your conversation history in `contexts/`:
 ### Step 2: Create Task YAML
 
 ```yaml
-# tasks/v2/my_task.yaml
+# tasks/my_task.yaml
 task_id: my_custom_task
 title: "My Custom Memory Evaluation"
 template: my_codebase                          # Optional: codebase in templates/
@@ -109,8 +109,8 @@ The included ShopMind task demonstrates this pattern:
 
 | Component | Path | Description |
 |-----------|------|-------------|
-| **Task** | `tasks/v2/shopmind.yaml` | 3-checkpoint basic evaluation |
-| **Extended Task** | `tasks/v2/shopmind_extended.yaml` | 12-checkpoint long-context stress test |
+| **Task** | `tasks/shopmind.yaml` | 3-checkpoint basic evaluation |
+| **Extended Task** | `tasks/shopmind_extended.yaml` | 12-checkpoint long-context stress test |
 | **History** | `contexts/shopmind_session_history.json` | ~50K token e-commerce session |
 | **Codebase** | `templates/shopmind/` | Full FastAPI e-commerce app |
 
@@ -195,7 +195,7 @@ Transform your coding session transcript into our JSON format:
 WorkMemEval includes a reference implementation using a ~50K token e-commerce project:
 
 ```yaml
-# tasks/yaml/shopmind_continuation.yaml
+# tasks/shopmind.yaml
 task_id: shopmind_continuation
 history_file: "contexts/shopmind_session_history.json"
 ```
@@ -226,7 +226,7 @@ Your custom task should include probes that test at least one (ideally all three
 ## Quick Start Checklist
 
 ```
-□ Create YAML task definition in tasks/yaml/
+□ Create YAML task definition in tasks/
 □ Create template directory in templates/
 □ Add stub files (initial state)
 □ Add test files (verification)
@@ -239,7 +239,7 @@ Your custom task should include probes that test at least one (ideally all three
 
 ## Step 1: Create the Task Definition (YAML)
 
-Create a new file in `tasks/yaml/` (e.g., `tasks/yaml/my_custom_task.yaml`):
+Create a new file in `tasks/` (e.g., `tasks/my_custom_task.yaml`):
 
 ```yaml
 task_id: my_custom_task
@@ -483,11 +483,11 @@ history_file: "contexts/my_long_history.json"
 
 ```bash
 # Run your task (V2)
-python workmemeval.py run --task tasks/v2/my_task.yaml
+python workmemeval.py run --task tasks/my_task.yaml
 
 # With a real LLM (requires OPENROUTER_API_KEY)
 export OPENROUTER_API_KEY=your-key-here
-python workmemeval.py run --task tasks/v2/my_task.yaml --model anthropic/claude-3.5-sonnet
+python workmemeval.py run --task tasks/my_task.yaml --model anthropic/claude-3.5-sonnet
 ```
 
 ### Docker Execution (Production/Isolated)
@@ -498,7 +498,7 @@ docker compose -f docker/compose.dev.yml build
 
 # Run evaluation
 docker compose -f docker/compose.dev.yml run --rm eval \
-  python workmemeval.py run --task tasks/v2/my_task.yaml
+  python workmemeval.py run --task tasks/my_task.yaml
 ```
 
 ---
@@ -511,7 +511,7 @@ docker compose -f docker/compose.dev.yml run --rm eval \
 |-----------|----------------|--------|
 | Repository root | `/app` | Read-only |
 | `evaluation_workspace/` | `/app/evaluation_workspace` | Read-write |
-| `tasks/yaml/` | `/app/tasks/yaml/` | Read-only |
+| `tasks/` | `/app/tasks/` | Read-only |
 | `templates/` | `/app/templates/` | Read-only |
 
 ### Adding Custom Mount Points
@@ -538,7 +538,7 @@ The CLI automatically resolves paths in multiple locations:
 3. `/app/{path}` (Docker container)
 4. `/app/tasks/{path}` (for task files)
 
-**Example:** `--task tasks/yaml/my_task.yaml` resolves to `/app/tasks/yaml/my_task.yaml` in Docker.
+**Example:** `--task tasks/my_task.yaml` resolves to `/app/tasks/my_task.yaml` in Docker.
 
 ### Custom External Tasks
 
@@ -591,7 +591,7 @@ source .env
 ```bash
 docker compose -f docker/compose.dev.yml run --rm \
   -e OPENROUTER_API_KEY=$OPENROUTER_API_KEY \
-  eval python workmemeval.py run --task tasks/v2/my_task.yaml --model anthropic/claude-3.5-sonnet
+  eval python workmemeval.py run --task tasks/my_task.yaml --model anthropic/claude-3.5-sonnet
 ```
 
 ---
@@ -601,12 +601,12 @@ docker compose -f docker/compose.dev.yml run --rm \
 ### Task File Not Found
 
 ```
-FileNotFoundError: Task file not found: tasks/yaml/my_task.yaml
+FileNotFoundError: Task file not found: tasks/my_task.yaml
 ```
 
 **Solutions:**
 - Verify the file exists at the specified path
-- In Docker, ensure the file is under `/app/tasks/yaml/`
+- In Docker, ensure the file is under `/app/tasks/`
 - Check file permissions
 
 ### Template Not Found
@@ -647,7 +647,7 @@ ValueError: Template 'my_template' not found
 
 Here's a minimal but complete task that tests all three pillars:
 
-### File: `tasks/yaml/expense_auditor.yaml`
+### File: `tasks/expense_auditor.yaml`
 
 ```yaml
 task_id: expense_auditor
@@ -734,7 +734,8 @@ evaluation_config:
 ```bash
 # Local with real LLM
 export OPENROUTER_API_KEY=your-key
-python workmemeval.py run --task tasks/v2/expense_auditor.yaml --model anthropic/claude-3.5-sonnet
+python workmemeval.py run --task tasks/expense_auditor.yaml --model anthropic/claude-3.5-sonnet
+
 ```
 
 Expected output:
@@ -755,6 +756,6 @@ Memory Pillar Scores:
 
 ## Next Steps
 
-- Review existing tasks in `tasks/yaml/` for more examples
+- Review existing tasks in `tasks/` for more examples
 - See `docs/memory_probe_framework.md` for advanced probe configuration
 - See `docs/enhanced_evaluation_system.md` for scoring details
