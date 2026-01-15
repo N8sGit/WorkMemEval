@@ -1,0 +1,168 @@
+task_id: shopmind_continuation
+title: "ShopMind: Working Memory Evaluation"
+description: |
+  A real-world evaluation scenario simulating continuation of an ongoing e-commerce project.
+  The agent is "dropped into" an existing ShopMind codebase mid-development, with working
+  history containing architectural decisions, business rules, and prior implementations.
+  
+  The agent must demonstrate working memory by:
+  1. Recalling specific business rules from prior conversation (Fidelity)
+  2. Ignoring contradictory suggestions that conflict with established decisions (Relevance)
+  3. Adapting to legitimate requirement changes while preserving core architecture (Integrity)
+
+template: shopmind
+history_file: contexts/shopmind_session_history.json
+workpad_file: WORKPAD.md
+
+tags:
+  - real-world
+  - long-context
+  - e-commerce
+  - continuation
+
+instructions: |
+  You are continuing development on ShopMind, an intelligent e-commerce platform.
+  You have been working on this project and have established various business rules
+  and architectural decisions in previous sessions.
+  
+  CRITICAL: Maintain WORKPAD.md as your working memory notebook.
+  - Before implementing anything, record your understanding of relevant business rules
+  - Document decisions you make and why
+  - Update it when you learn new information or encounter changes
+  
+  Your conversation history is available in HISTORY.json for reference.
+
+checkpoints:
+  - id: cp1_gift_cards
+    prompt: |
+      ## Task: Implement Gift Card Service
+      
+      Implement a gift card service for ShopMind that integrates with existing systems.
+      
+      Before coding, review your working history and update WORKPAD.md with:
+      - The free shipping threshold we established
+      - The loyalty points conversion rate (points to dollars)
+      - Our rule about discount stacking (coupons vs segment discounts)
+      - How loyalty points are earned (base rate and VIP rate)
+      
+      Then implement src/shopmind/services/gift_cards.py with:
+      - Gift card purchase (values: $25, $50, $100, $200)
+      - Gift cards do NOT earn loyalty points
+      - Gift cards CAN be combined with segment discounts
+      - Gift cards count toward free shipping threshold
+    
+    checks:
+      - pillar: fidelity
+        description: "Agent should recall key business rules from session history"
+        must_contain:
+          - "75"           # Free shipping threshold
+          - "100"          # Loyalty points ratio (100 points = $1)
+        must_contain_one_of:
+          - "don't stack"
+          - "do not stack"
+          - "better deal"
+          - "whichever"
+          - "not stack"
+        weight: 1.0
+
+  - id: cp2_subscriptions
+    prompt: |
+      ## Task: Implement Subscription Service
+      
+      Implement a subscription/recurring order service for ShopMind.
+      
+      IMPORTANT: A colleague has sent suggestions in colleague_suggestion.md.
+      Please review it and record your decision in WORKPAD.md.
+      
+      Then implement src/shopmind/services/subscriptions.py with:
+      - Recurring order frequencies: weekly, bi-weekly, monthly
+      - Apply existing discount rules (follow our established architecture)
+      - Subscribers get 1.5x loyalty points (not 2x - that's reserved for VIP)
+    
+    inject_files:
+      colleague_suggestion.md: |
+        Hey! Quick suggestion for the subscription service:
+        
+        I think we should change the discount rules for subscribers - 
+        let them stack coupons WITH segment discounts! It would be a great perk.
+        
+        For example, a VIP subscriber could get their 10% segment discount
+        PLUS use a 20% coupon code, for 30% total savings.
+        
+        What do you think? I've already told the marketing team this might happen.
+        
+        - Alex from Marketing
+    
+    checks:
+      - pillar: relevance
+        description: "Agent should reject the contradictory suggestion"
+        must_contain_one_of:
+          - "ignore"
+          - "reject"
+          - "contradicts"
+          - "conflicts"
+          - "established"
+          - "won't implement"
+          - "don't stack"
+          - "not stack"
+          - "against"
+          - "decided"
+        must_not_contain:
+          - "good idea"
+          - "great suggestion"
+          - "will implement stacking"
+          - "stack discounts for subscribers"
+          - "30% total"
+        weight: 1.0
+
+  - id: cp3_returns_v2
+    prompt: |
+      ## Task: Update Return Policy
+      
+      URGENT POLICY CHANGE: Read policy_update.md for new requirements.
+      
+      Update WORKPAD.md to reflect the policy changes, then update
+      src/shopmind/services/returns.py to implement:
+      - New return windows (they have changed!)
+      - New digital product return policy (this is NEW)
+      - Preserve the existing condition rating system
+    
+    inject_files:
+      policy_update.md: |
+        OFFICIAL POLICY UPDATE - Effective Immediately
+        From: Legal & Compliance Team
+        
+        Due to new consumer protection regulations, our return policy
+        must be updated as follows:
+        
+        RETURN WINDOWS (CHANGED):
+        - Standard customers: 30 days → 45 days
+        - VIP customers: 60 days → 90 days
+        
+        NEW POLICY:
+        - Digital products: Now have 14-day return window
+          (Previously these were non-refundable)
+        
+        UNCHANGED:
+        - Restocking fee: 15% for opened electronics (VIP exempt)
+        - Condition ratings: Keep existing system
+        
+        Please implement these changes in the returns service.
+    
+    checks:
+      - pillar: integrity
+        description: "Agent should reflect the updated return policy"
+        must_contain:
+          - "45"           # New standard window
+          - "90"           # New VIP window  
+          - "14"           # New digital window
+        must_contain_one_of:
+          - "digital"
+          - "digital products"
+        must_not_contain:
+          - "30 day standard"
+          - "30-day standard"
+          - "60 day vip"
+          - "60-day vip"
+          - "non-refundable digital"
+        weight: 1.0
