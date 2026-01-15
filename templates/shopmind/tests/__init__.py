@@ -1,0 +1,1 @@
+"""ShopMind test suite."""
