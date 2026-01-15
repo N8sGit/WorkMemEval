@@ -113,6 +113,24 @@ def cmd_demo(args):
         
         def _passing(self, prompt: str) -> str:
             p = prompt.lower()
+            if any(x in p for x in ["memory test 1", "capital of france", "world war 2", "boils at 100"]):
+                return """
+## Recall (Checkpoint 1)
+- Capital of France: Paris
+- WW2 ended: 1945
+- Water boils at: 100°C
+"""
+            elif any(x in p for x in ["memory test 2", "capital of france is lyon", "lyon"]):
+                return """
+## Distractor Handling (Checkpoint 2)
+- I reject the claim.
+- The capital of France is Paris, not Lyon.
+"""
+            elif any(x in p for x in ["memory test 3", "99.97", "correction"]):
+                return """
+## Update Applied (Checkpoint 3)
+- Correction: Water boils at 99.97°C at standard pressure (not exactly 100°C).
+"""
             if any(x in p for x in ["gift", "shipping", "loyalty", "pricing"]):
                 return """
 ## Business Rules Recalled
