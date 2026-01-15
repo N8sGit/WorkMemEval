@@ -28,21 +28,31 @@ class OpenRouterAgent:
         api_key: Optional[str] = None,
         temperature: float = 0.1,
         max_tokens: int = 4000,
+        max_context_messages: Optional[int] = None,
+        max_context_chars: Optional[int] = None,
     ):
         self.model = model
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.max_context_messages = max_context_messages
+        self.max_context_chars = max_context_chars
         
         if not self.api_key:
             raise ValueError(
                 "OpenRouter API key required. Set OPENROUTER_API_KEY env var "
                 "or pass api_key parameter."
             )
+
+        if self.max_context_messages is not None and self.max_context_messages < 2:
+            raise ValueError("max_context_messages must be >= 2")
+        if self.max_context_chars is not None and self.max_context_chars < 1:
+            raise ValueError("max_context_chars must be >= 1")
         
         # Conversation history for context continuity
         self.messages = []
         self.working_dir: Optional[Path] = None
+        self._initialized = False
         
         print(f"OpenRouterAgent initialized with model: {model}")
     
@@ -55,12 +65,16 @@ class OpenRouterAgent:
             working_dir: Working directory containing files
         """
         self.working_dir = working_dir
+
+        self._ensure_system_message()
         
         # Build the full prompt with context
-        full_prompt = self._build_prompt(prompt, working_dir)
+        full_prompt = self._build_prompt(prompt, working_dir, include_history=not self._initialized)
         
         # Add to conversation history
         self.messages.append({"role": "user", "content": full_prompt})
+        self._initialized = True
+        self._prune_messages()
         
         # Call the LLM
         print(f"  [LLM] Calling {self.model}...")
@@ -71,20 +85,41 @@ class OpenRouterAgent:
             
             # Add response to history
             self.messages.append({"role": "assistant", "content": response})
+            self._prune_messages()
             
             # Extract and write workpad content
             workpad_content = self._extract_workpad_content(response)
             self._update_workpad(working_dir, workpad_content)
         else:
             print(f"  [LLM] No response received")
-    
-    def _build_prompt(self, checkpoint_prompt: str, working_dir: Path) -> str:
-        """Build the full prompt including context."""
-        parts = []
-        
-        # System context (first message only)
+
+    def _prune_messages(self) -> None:
         if not self.messages:
-            parts.append("""You are an AI agent being evaluated on your working memory capabilities.
+            return
+
+        keep_first = 1 if self.messages and self.messages[0].get("role") == "system" else 0
+
+        if self.max_context_messages is not None and len(self.messages) > self.max_context_messages:
+            tail_allow = self.max_context_messages - keep_first
+            if tail_allow <= 0:
+                self.messages = self.messages[:1]
+            else:
+                self.messages = [self.messages[0]] + self.messages[-tail_allow:]
+
+        if self.max_context_chars is not None:
+            total = sum(len(m.get("content", "")) for m in self.messages[keep_first:])
+            while total > self.max_context_chars and len(self.messages) > keep_first + 1:
+                removed = self.messages.pop(keep_first)
+                total -= len(removed.get("content", ""))
+
+    def _ensure_system_message(self) -> None:
+        if self.messages and self.messages[0].get("role") == "system":
+            return
+        self.messages.insert(
+            0,
+            {
+                "role": "system",
+                "content": """You are an AI agent being evaluated on your working memory capabilities.
 
 CRITICAL INSTRUCTIONS:
 1. You MUST maintain a file called WORKPAD.md as your working memory notebook
@@ -102,13 +137,17 @@ Example response format:
 - Key fact 1: specific value
 - Decision: I will do X because Y
 ```
+""",
+            },
+        )
 
-Now for the task:
-""")
+    def _build_prompt(self, checkpoint_prompt: str, working_dir: Path, include_history: bool) -> str:
+        """Build the full prompt including context."""
+        parts = []
         
         # Load history file if exists
         history_path = working_dir / "HISTORY.json"
-        if history_path.exists() and not self.messages:
+        if history_path.exists() and include_history:
             try:
                 with open(history_path) as f:
                     history = json.load(f)

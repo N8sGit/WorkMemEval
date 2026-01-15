@@ -64,7 +64,12 @@ def cmd_run(args):
     
     async def _run():
         task = load_task(task_path)
-        agent = OpenRouterAgent(model=args.model, api_key=api_key)
+        agent = OpenRouterAgent(
+            model=args.model,
+            api_key=api_key,
+            max_context_messages=args.max_context_messages,
+            max_context_chars=args.max_context_chars,
+        )
         
         runner = V2Runner(
             output_dir=Path("evaluation_runs/v2"),
@@ -186,6 +191,10 @@ Examples:
                             help="Run in Docker container")
     run_parser.add_argument("--docker-image", default="workmemeval/eval:local",
                             help="Docker image for containerized execution")
+    run_parser.add_argument("--max-context-messages", type=int, default=None,
+                            help="Limit chat history length sent to the model")
+    run_parser.add_argument("--max-context-chars", type=int, default=None,
+                            help="Approximate cap on total context size (characters)")
     run_parser.set_defaults(func=cmd_run)
     
     # demo: V2 with mock agent

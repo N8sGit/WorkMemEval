@@ -161,7 +161,12 @@ def create_default_agent(args):
     if args.model:
         # Create V2 LLM-backed agent
         try:
-            return OpenRouterAgent(model=args.model, api_key=api_key)
+            return OpenRouterAgent(
+                model=args.model,
+                api_key=api_key,
+                max_context_messages=args.max_context_messages,
+                max_context_chars=args.max_context_chars,
+            )
         except Exception as e:
             print(f"Warning: Could not create OpenRouterAgent: {e}")
             return None
@@ -202,6 +207,10 @@ def main(argv=None) -> int:
     p_run.add_argument("--agent", help="Agent to use: 'mock' or module:Class")
     p_run.add_argument("--agent-config", help="JSON config for custom agent")
     p_run.add_argument("--model", help="LLM model (requires OPENROUTER_API_KEY)")
+    p_run.add_argument("--max-context-messages", type=int, default=None,
+                       help="Limit chat history length sent to the model")
+    p_run.add_argument("--max-context-chars", type=int, default=None,
+                       help="Approximate cap on total context size (characters)")
     p_run.add_argument("--json", action="store_true", help="Output JSON result")
     p_run.add_argument("--threshold", type=float, help="Pass threshold (default: 0.5)")
     p_run.set_defaults(func=cmd_run)
