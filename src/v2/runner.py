@@ -20,6 +20,7 @@ from typing import Any, Optional, Protocol
 
 from .models import Task, Checkpoint, EvaluationResult, CheckpointResult, SemanticCheck
 from .assessor import WorkpadAssessor
+from .secure_file_ops import SecureFileOperations
 
 # Optional semantic assessor
 try:
@@ -126,8 +127,12 @@ class V2Runner:
         
         # Initialize workpad
         workpad_path = working_dir / task.workpad_file
+        secure_ops = SecureFileOperations(working_dir) if self.secure_mode else None
         if not workpad_path.exists():
-            workpad_path.write_text("# Working Memory\n\n")
+            if secure_ops:
+                secure_ops.write_file(task.workpad_file, "# Working Memory\n\n")
+            else:
+                workpad_path.write_text("# Working Memory\n\n")
         
         # Execute checkpoints
         checkpoint_results = []
@@ -137,7 +142,10 @@ class V2Runner:
             
             # Inject any checkpoint-specific files
             for filename, content in checkpoint.inject_files.items():
-                (working_dir / filename).write_text(content)
+                if secure_ops:
+                    secure_ops.write_file(filename, content)
+                else:
+                    (working_dir / filename).write_text(content)
             
             # Build full prompt with task instructions
             full_prompt = self._build_prompt(task, checkpoint)
@@ -149,7 +157,10 @@ class V2Runner:
                 print(f"  ⚠ Agent error: {e}")
             
             # Read and evaluate workpad
-            workpad_content = workpad_path.read_text() if workpad_path.exists() else ""
+            if workpad_path.exists():
+                workpad_content = secure_ops.read_file(task.workpad_file) if secure_ops else workpad_path.read_text()
+            else:
+                workpad_content = ""
             
             # Pattern-based assessment (deterministic)
             pillar_scores, check_details = self.assessor.evaluate_with_details(
@@ -173,11 +184,13 @@ class V2Runner:
                 print(f"  [Semantic] Done")
             
             # Record result
+            context_metrics = self._collect_context_metrics(agent)
             cp_result = CheckpointResult(
                 checkpoint_id=checkpoint.id,
                 pillar_scores=pillar_scores,
                 workpad_snapshot=workpad_content,
                 check_details=check_details + semantic_details,
+                context_metrics=context_metrics,
             )
             checkpoint_results.append(cp_result)
             
@@ -227,6 +240,26 @@ class V2Runner:
         
         if self.use_container:
             print(f"  Container mode: {self.docker_image}")
+
+    def _collect_context_metrics(self, agent: Any) -> dict[str, Any]:
+        metrics: dict[str, Any] = {}
+
+        messages = getattr(agent, "messages", None)
+        if isinstance(messages, list):
+            metrics["message_count"] = len(messages)
+            metrics["non_system_message_count"] = len([m for m in messages if m.get("role") != "system"])
+            non_system_chars = sum(len(m.get("content", "")) for m in messages if m.get("role") != "system")
+            metrics["non_system_chars"] = non_system_chars
+            metrics["approx_tokens"] = int(non_system_chars / 4) if non_system_chars else 0
+
+        max_ctx_messages = getattr(agent, "max_context_messages", None)
+        if max_ctx_messages is not None:
+            metrics["max_context_messages"] = max_ctx_messages
+        max_ctx_chars = getattr(agent, "max_context_chars", None)
+        if max_ctx_chars is not None:
+            metrics["max_context_chars"] = max_ctx_chars
+
+        return metrics
     
     def _materialize_template(self, template_name: str, working_dir: Path) -> None:
         """Copy template files into working directory."""

@@ -11,6 +11,8 @@ import httpx
 from pathlib import Path
 from typing import Optional
 
+from .secure_file_ops import SecureFileOperations
+
 
 class OpenRouterAgent:
     """
@@ -30,6 +32,8 @@ class OpenRouterAgent:
         max_tokens: int = 4000,
         max_context_messages: Optional[int] = None,
         max_context_chars: Optional[int] = None,
+        secure_mode: bool = True,
+        max_file_size: int = 1024 * 1024,
     ):
         self.model = model
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
@@ -37,6 +41,8 @@ class OpenRouterAgent:
         self.max_tokens = max_tokens
         self.max_context_messages = max_context_messages
         self.max_context_chars = max_context_chars
+        self.secure_mode = secure_mode
+        self.max_file_size = max_file_size
         
         if not self.api_key:
             raise ValueError(
@@ -53,6 +59,7 @@ class OpenRouterAgent:
         self.messages = []
         self.working_dir: Optional[Path] = None
         self._initialized = False
+        self._secure_file_ops: Optional[SecureFileOperations] = None
         
         print(f"OpenRouterAgent initialized with model: {model}")
     
@@ -65,6 +72,9 @@ class OpenRouterAgent:
             working_dir: Working directory containing files
         """
         self.working_dir = working_dir
+
+        if self.secure_mode:
+            self._secure_file_ops = SecureFileOperations(working_dir, max_file_size=self.max_file_size)
 
         self._ensure_system_message()
         
@@ -149,8 +159,11 @@ Example response format:
         history_path = working_dir / "HISTORY.json"
         if history_path.exists() and include_history:
             try:
-                with open(history_path) as f:
-                    history = json.load(f)
+                if self._secure_file_ops:
+                    history = json.loads(self._secure_file_ops.read_file("HISTORY.json"))
+                else:
+                    with open(history_path) as f:
+                        history = json.load(f)
                 parts.append("\n--- CONVERSATION HISTORY ---\n")
                 for msg in history[-10:]:  # Last 10 messages for context
                     role = msg.get("role", "unknown")
@@ -163,7 +176,10 @@ Example response format:
         # Current workpad content
         workpad_path = working_dir / "WORKPAD.md"
         if workpad_path.exists():
-            current_workpad = workpad_path.read_text()
+            if self._secure_file_ops:
+                current_workpad = self._secure_file_ops.read_file("WORKPAD.md")
+            else:
+                current_workpad = workpad_path.read_text()
             if current_workpad.strip():
                 parts.append(f"\n--- CURRENT WORKPAD.md ---\n{current_workpad}\n--- END WORKPAD ---\n\n")
         
@@ -171,7 +187,10 @@ Example response format:
         for filename in ["colleague_suggestion.md", "policy_update.md", "suggestion.md", "update.md"]:
             file_path = working_dir / filename
             if file_path.exists():
-                content = file_path.read_text()
+                if self._secure_file_ops:
+                    content = self._secure_file_ops.read_file(filename)
+                else:
+                    content = file_path.read_text()
                 parts.append(f"\n--- FILE: {filename} ---\n{content}\n--- END FILE ---\n\n")
         
         # The actual checkpoint prompt
@@ -248,10 +267,16 @@ Example response format:
         
         existing = ""
         if workpad_path.exists():
-            existing = workpad_path.read_text()
+            if self._secure_file_ops:
+                existing = self._secure_file_ops.read_file("WORKPAD.md")
+            else:
+                existing = workpad_path.read_text()
         
         # Append new content
         updated = existing + "\n\n" + new_content
-        workpad_path.write_text(updated)
+        if self._secure_file_ops:
+            self._secure_file_ops.write_file("WORKPAD.md", updated, append=False)
+        else:
+            workpad_path.write_text(updated)
         
         print(f"  [LLM] Updated WORKPAD.md (+{len(new_content)} chars)")

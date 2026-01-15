@@ -17,6 +17,7 @@ from .models import Task, Checkpoint, WorkpadCheck, SemanticCheck, EvaluationRes
 from .task_loader import load_task
 from .assessor import WorkpadAssessor
 from .runner import V2Runner
+from .secure_file_ops import SecureFileOperations, SecurityViolationError
 
 # Optional: LLM-based semantic assessment
 try:
@@ -37,4 +38,6 @@ __all__ = [
     "SemanticAssessor",
     "HybridAssessor",
     "V2Runner",
+    "SecureFileOperations",
+    "SecurityViolationError",
 ]

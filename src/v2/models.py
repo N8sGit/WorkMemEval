@@ -104,6 +104,7 @@ class CheckpointResult:
     pillar_scores: dict[str, float] = field(default_factory=dict)
     workpad_snapshot: str = ""
     check_details: list[dict[str, Any]] = field(default_factory=list)
+    context_metrics: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass 
@@ -158,6 +159,7 @@ class EvaluationResult:
                     "pillar_scores": cp.pillar_scores,
                     "workpad_snapshot": cp.workpad_snapshot,
                     "check_details": cp.check_details,
+                    "context_metrics": cp.context_metrics,
                 }
                 for cp in self.checkpoint_results
             ],
