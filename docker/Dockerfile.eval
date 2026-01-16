@@ -27,6 +27,7 @@ RUN pip install --upgrade pip && \
 COPY src/ /app/src/
 COPY tasks/ /app/tasks/
 COPY templates/ /app/templates/
+COPY contexts/ /app/contexts/
 COPY workmemeval.py /app/
 
 # Switch to non-root user

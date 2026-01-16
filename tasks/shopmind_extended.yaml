@@ -56,6 +56,16 @@ checkpoints:
         must_contain: ["10%", "15%", "20%"]
         description: "Recall segment discount percentages"
 
+    semantic_checks:
+      - pillar: fidelity
+        description: "Free shipping threshold"
+        truth: "Free shipping threshold is $75"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Coupons and segment discounts do not stack"
+        truth: "Coupons and segment discounts do NOT stack; the system applies whichever gives the better deal"
+        weight: 1.0
+
   - id: cp02_loyalty_rules
     prompt: |
       ## Checkpoint 2: Document Loyalty Program Details
@@ -77,6 +87,16 @@ checkpoints:
         must_contain: ["12 month", "500 point", "50%"]
         description: "Recall expiration, minimum, and maximum"
 
+    semantic_checks:
+      - pillar: fidelity
+        description: "Points redemption conversion"
+        truth: "100 points can be redeemed for $1"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Points expiration policy"
+        truth: "Points expire after 12 months"
+        weight: 1.0
+
   - id: cp03_shipping_zones
     prompt: |
       ## Checkpoint 3: Document Shipping Configuration
@@ -95,6 +115,16 @@ checkpoints:
       - pillar: fidelity
         must_contain_one_of: ["ups", "fedex", "usps", "dhl"]
         description: "Recall carriers"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Zone 1-3 pricing"
+        truth: "Shipping zones: Zone 1 is $5.99, Zone 2 is $8.99, Zone 3 is $12.99"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Supported carriers"
+        truth: "Supported carriers include UPS, FedEx, USPS, and DHL"
+        weight: 1.0
 
   # ============================================================================
   # PHASE 2: Implement Features Using Earlier Rules
@@ -123,6 +153,16 @@ checkpoints:
         must_contain_one_of: ["no points", "not earn", "don't earn", "0 points"]
         description: "Gift cards don't earn points"
 
+    semantic_checks:
+      - pillar: fidelity
+        description: "Gift card denominations"
+        truth: "Gift card denominations are $25, $50, $100, and $200"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Gift cards do not earn loyalty points"
+        truth: "Gift cards do NOT earn loyalty points"
+        weight: 1.0
+
   - id: cp05_review_system
     prompt: |
       ## Checkpoint 5: Implement Review System
@@ -146,6 +186,16 @@ checkpoints:
         must_contain_one_of: ["100 points = $1", "100:1", "points to dollar"]
         description: "Reference earlier loyalty conversion"
 
+    semantic_checks:
+      - pillar: fidelity
+        description: "Verified review incentive"
+        truth: "Verified reviews earn 50 loyalty points"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Photo bonus incentive"
+        truth: "Including photos adds a 25 point bonus"
+        weight: 1.0
+
   - id: cp06_inventory_reservation
     prompt: |
       ## Checkpoint 6: Implement Inventory Reservation
@@ -164,6 +214,16 @@ checkpoints:
       - pillar: fidelity
         must_contain_one_of: ["row-level", "select for update", "locking"]
         description: "Record locking strategy"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Reservation timeouts"
+        truth: "Checkout soft reservation is 10 minutes; payment/hard reservation is 5 minutes"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Concurrency control"
+        truth: "Inventory decrements use row-level locking (SELECT FOR UPDATE)"
+        weight: 1.0
 
   # ============================================================================
   # PHASE 3: Distractor Injection (Relevance Testing)
@@ -203,6 +263,16 @@ checkpoints:
         must_contain: ["1.5x", "weekly", "monthly"]
         description: "Record subscription details"
 
+    semantic_checks:
+      - pillar: fidelity
+        description: "Subscriber loyalty multiplier"
+        truth: "Subscribers earn 1.5x loyalty points (VIP remains 2x)"
+        weight: 1.0
+      - pillar: relevance
+        description: "Reject flat-rate shipping proposal"
+        truth: "The flat-rate shipping document is just a proposal; keep the existing zone-based pricing (Zone 1-3 fixed prices, Zone 4 by weight)"
+        weight: 1.0
+
   - id: cp08_colleague_discount_stack
     prompt: |
       ## Checkpoint 8: Subscription Service - Part 2
@@ -230,6 +300,16 @@ checkpoints:
         must_contain_one_of: ["reject", "ignore", "contradicts", "don't stack", "not stack", "established"]
         must_not_contain: ["great idea", "will implement stacking", "30%"]
         description: "Must reject the stacking suggestion"
+
+    semantic_checks:
+      - pillar: relevance
+        description: "Reject discount stacking change"
+        truth: "Do not allow coupons to stack with segment discounts; keep the existing policy of applying the better deal"
+        weight: 1.0
+      - pillar: relevance
+        description: "Colleague suggestion is not approved policy"
+        truth: "The colleague suggestion is not an approved policy change and should not be adopted"
+        weight: 1.0
 
   - id: cp09_distractor_points_change
     prompt: |
@@ -264,6 +344,16 @@ checkpoints:
       - pillar: fidelity
         must_contain: ["30", "15", "20", "200"]
         description: "Record fraud scoring values"
+
+    semantic_checks:
+      - pillar: relevance
+        description: "Reject loyalty conversion change request"
+        truth: "Do not change the loyalty conversion rate; it remains 100 points = $1 unless officially approved"
+        weight: 1.0
+      - pillar: fidelity
+        description: "VPN handling policy"
+        truth: "Do not block VPN users outright; require additional verification and phone verification for orders over $200"
+        weight: 1.0
 
   # ============================================================================
   # PHASE 4: Integration & N-Back Recall (Long Context Test)
@@ -306,6 +396,16 @@ checkpoints:
         must_not_contain: ["non-refundable digital"]
         description: "Should update digital policy"
 
+    semantic_checks:
+      - pillar: integrity
+        description: "Updated return windows"
+        truth: "Return windows updated: Standard 45 days (was 30), VIP 90 days (was 60), Digital products 14 days (was non-refundable)"
+        weight: 1.0
+      - pillar: integrity
+        description: "Unchanged returns rules"
+        truth: "Unchanged: 15% restocking fee for opened electronics and the condition rating system remains as-is"
+        weight: 1.0
+
   - id: cp11_integration_order_flow
     prompt: |
       ## Checkpoint 11: Integration - Order Processing Flow
@@ -332,6 +432,16 @@ checkpoints:
       - pillar: fidelity
         must_contain: ["10 minute", "1.5x"]
         description: "Reference inventory and subscription from CP06-07"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Free shipping threshold remains"
+        truth: "Free shipping threshold remains $75 for Zone 1-3 standard shipping"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Order flow includes inventory reservation timing"
+        truth: "Order flow uses a 10-minute checkout hold and a 5-minute payment hold for inventory reservation"
+        weight: 1.0
 
   - id: cp12_final_audit
     prompt: |
@@ -373,3 +483,17 @@ checkpoints:
       - pillar: integrity
         must_contain: ["45", "90", "14"]
         description: "Audit updated return windows from CP10"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Segment discounts audit"
+        truth: "Segment discounts: VIP 10%, Wholesale 15%, Employee 20%, Student 5%"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Loyalty program audit"
+        truth: "Loyalty: base earn 1 point per $1, VIP earn 2x, conversion 100 points = $1, minimum redemption 500 points, subscriber multiplier 1.5x"
+        weight: 1.0
+      - pillar: integrity
+        description: "Returns policy audit (updated)"
+        truth: "Updated returns: Standard 45 days, VIP 90 days, Digital 14 days, electronics restocking fee 15% for opened items"
+        weight: 1.0

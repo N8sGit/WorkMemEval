@@ -19,7 +19,7 @@ WorkMemEval/
 │       └── src/...
 ├── contexts/
 │   └── my_session_history.json   # Conversation history to recall from
-└── run_v2_live.py                # Entry point
+└── workmemeval.py                # Entry point
 ```
 
 ### Step 1: Create Session History (Context)
@@ -97,10 +97,11 @@ checkpoints:
 export OPENROUTER_API_KEY=your_key
 
 # Run your task
-python run_v2_live.py --task my_custom_task
+python workmemeval.py run --task tasks/my_task.yaml
 
-# Or with Docker isolation
-python run_v2_live.py --task my_custom_task --container
+# Or with Docker isolation (recommended)
+docker compose -f docker/compose.dev.yml run --rm eval \
+  python workmemeval.py run --task tasks/my_task.yaml
 ```
 
 ### Example: ShopMind Task
@@ -487,6 +488,9 @@ python workmemeval.py run --task tasks/my_task.yaml
 
 # With a real LLM (requires OPENROUTER_API_KEY)
 export OPENROUTER_API_KEY=your-key-here
+
+# Default model is openai/gpt-5.2 (override with --model if desired)
+python workmemeval.py run --task tasks/my_task.yaml
 python workmemeval.py run --task tasks/my_task.yaml --model anthropic/claude-3.5-sonnet
 ```
 
@@ -564,8 +568,8 @@ docker compose -f docker/compose.dev.yml run --rm \
 --model claude-3-opus
 
 # GPT
---model gpt-4-turbo
---model gpt-4
+--model openai/gpt-5.2
+--model openai/gpt-4o-mini
 
 # Llama
 --model llama-3.1-70b
@@ -757,5 +761,4 @@ Memory Pillar Scores:
 ## Next Steps
 
 - Review existing tasks in `tasks/` for more examples
-- See `docs/memory_probe_framework.md` for advanced probe configuration
-- See `docs/enhanced_evaluation_system.md` for scoring details
+- See `docs/task_complexity_measurement.md` for notes on task sizing/complexity

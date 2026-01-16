@@ -153,25 +153,25 @@ def create_default_agent(args):
     
     # Check for API key
     api_key = os.getenv("OPENROUTER_API_KEY")
-    
-    if not api_key and not args.model:
+
+    if not api_key:
         print("Note: No OPENROUTER_API_KEY set. Use --agent mock for testing.")
         return None
-    
-    if args.model:
-        # Create V2 LLM-backed agent
-        try:
-            return OpenRouterAgent(
-                model=args.model,
-                api_key=api_key,
-                max_context_messages=args.max_context_messages,
-                max_context_chars=args.max_context_chars,
-            )
-        except Exception as e:
-            print(f"Warning: Could not create OpenRouterAgent: {e}")
-            return None
 
-    return None
+    # Create V2 LLM-backed agent (model is optional; OpenRouterAgent has a default)
+    try:
+        kwargs = {}
+        if args.model:
+            kwargs["model"] = args.model
+        return OpenRouterAgent(
+            api_key=api_key,
+            max_context_messages=args.max_context_messages,
+            max_context_chars=args.max_context_chars,
+            **kwargs,
+        )
+    except Exception as e:
+        print(f"Warning: Could not create OpenRouterAgent: {e}")
+        return None
 
 
 def load_custom_agent(agent_path: str, config_json: Optional[str]):

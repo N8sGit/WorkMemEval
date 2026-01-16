@@ -70,14 +70,14 @@ docker compose -f docker/compose.dev.yml run --rm eval python workmemeval.py run
 |------|-------------|-------|------------|
 | `simple` | 3 | Basic recall | Pattern only |
 | `shopmind` | 3 | All pillars | Pattern only |
-| `extended` | 12 | Long context stress | Pattern only |
+| `extended` | 12 | Long context stress | Pattern + optional LLM |
 | `semantic` | 3 | Hybrid assessment demo | **Pattern + LLM** |
 
 ```bash
 # Run different tasks
-python workmemeval.py run --task shopmind   # Pattern-based assessment
+python workmemeval.py run --task shopmind   # Default model: openai/gpt-5.2 (override with --model)
 python workmemeval.py run --task semantic   # Hybrid: pattern + LLM grading
-python workmemeval.py run --task extended   # Long-context stress test
+python workmemeval.py run --task extended   # Long-context stress test (includes semantic checks)
 ```
 
 ### Local Development (Alternative)
@@ -198,6 +198,8 @@ docker compose -f docker/compose.dev.yml build
 docker compose -f docker/compose.dev.yml run --rm eval python workmemeval.py run --task shopmind
 docker compose -f docker/compose.dev.yml run --rm eval python workmemeval.py run --task semantic
 ```
+
+The eval image includes the built-in `contexts/` directory for the included tasks. For BYOC, mount your own contexts/templates via Docker volumes.
 
 Container security features:
 - Non-root user (UID/GID 10001)

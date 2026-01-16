@@ -82,7 +82,7 @@ Respond with ONLY this JSON format:
 
     def __init__(
         self,
-        model: str = "openai/gpt-4o-mini",
+        model: str = "openai/gpt-5.2",
         api_key: Optional[str] = None,
         temperature: float = 0.0,
         num_votes: int = 1,

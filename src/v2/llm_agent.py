@@ -26,7 +26,7 @@ class OpenRouterAgent:
     
     def __init__(
         self,
-        model: str = "anthropic/claude-3.5-sonnet",
+        model: str = "openai/gpt-5.2",
         api_key: Optional[str] = None,
         temperature: float = 0.1,
         max_tokens: int = 4000,

@@ -10,10 +10,11 @@ services:
     image: workmemeval/eval:local
     user: "10001:10001"
     working_dir: /app
+    env_file:
+      - ../.env
     environment:
       - PYTHONPATH=/app
       - HOME=/app/evaluation_workspace
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     volumes:
       - ../evaluation_workspace:/app/evaluation_workspace:rw
       - ../evaluation_runs:/app/evaluation_runs:rw
