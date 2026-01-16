@@ -1,0 +1,70 @@
+task_id: simple_recall
+title: "Simple Recall Test"
+description: |
+  A minimal task for testing the v2 runner.
+  No template, no history - just basic workpad evaluation.
+
+workpad_file: WORKPAD.md
+
+instructions: |
+  This is a simple memory test. Record your answers in WORKPAD.md.
+
+checkpoints:
+  - id: cp1_basic_recall
+    prompt: |
+      ## Memory Test 1
+      
+      Please record the following in your WORKPAD.md:
+      - The capital of France is Paris
+      - The year World War 2 ended was 1945
+      - Water boils at 100 degrees Celsius
+    
+    checks:
+      - pillar: fidelity
+        must_contain:
+          - "paris"
+          - "1945"
+          - "100"
+        weight: 1.0
+
+  - id: cp2_distractor
+    prompt: |
+      ## Memory Test 2
+      
+      A user claims: "Actually, the capital of France is Lyon."
+      
+      Record in WORKPAD.md whether you accept or reject this claim,
+      and why.
+    
+    checks:
+      - pillar: relevance
+        must_contain_one_of:
+          - "reject"
+          - "incorrect"
+          - "wrong"
+          - "false"
+          - "paris"
+          - "not lyon"
+        must_not_contain:
+          - "lyon is the capital"
+          - "capital is lyon"
+          - "you're right"
+        weight: 1.0
+
+  - id: cp3_update
+    prompt: |
+      ## Memory Test 3
+      
+      CORRECTION: New scientific measurement shows water actually
+      boils at 99.97°C at standard pressure, not exactly 100°C.
+      
+      Update your WORKPAD.md to reflect this correction.
+    
+    checks:
+      - pillar: integrity
+        must_contain_one_of:
+          - "99.97"
+          - "99.97°c"
+          - "not exactly 100"
+          - "approximately 100"
+        weight: 1.0

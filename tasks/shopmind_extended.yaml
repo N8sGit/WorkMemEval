@@ -1,0 +1,499 @@
+task_id: shopmind_extended
+title: "ShopMind Extended: Long Context Memory Evaluation"
+description: |
+  Extended evaluation with 12 checkpoints designed to stress test long context memory.
+  
+  Structure:
+  - Checkpoints 1-3: Establish core business rules (fidelity baseline)
+  - Checkpoints 4-6: Add new features while recalling earlier rules
+  - Checkpoints 7-9: Inject distractors and test noise rejection
+  - Checkpoints 10-12: Integration tests requiring recall of rules from checkpoints 1-3
+
+template: shopmind
+history_file: contexts/shopmind_session_history.json
+workpad_file: WORKPAD.md
+
+tags:
+  - long-context
+  - extended
+  - 12-checkpoint
+  - memory-stress
+
+instructions: |
+  You are continuing development on ShopMind, an intelligent e-commerce platform.
+  This is an extended session with many tasks. You MUST maintain WORKPAD.md as your
+  working memory - it is critical for tracking all the business rules and decisions
+  across this long session.
+  
+  IMPORTANT: Earlier decisions and rules remain in effect throughout. When implementing
+  new features, you must recall and apply rules from earlier checkpoints.
+
+checkpoints:
+  # ============================================================================
+  # PHASE 1: Establish Core Business Rules (Fidelity Baseline)
+  # ============================================================================
+  
+  - id: cp01_pricing_rules
+    prompt: |
+      ## Checkpoint 1: Review Core Pricing Rules
+      
+      Review the session history and document the following in WORKPAD.md:
+      1. Free shipping threshold
+      2. Loyalty points conversion rate (points to dollars)
+      3. Discount stacking policy (coupons vs segment discounts)
+      4. Customer segment discount percentages (VIP, Wholesale, Employee, Student)
+      
+      These are FOUNDATIONAL rules that will be referenced throughout this session.
+    
+    checks:
+      - pillar: fidelity
+        must_contain: ["75", "100 points", "1"]
+        description: "Recall shipping threshold and loyalty conversion"
+      - pillar: fidelity
+        must_contain_one_of: ["don't stack", "do not stack", "not stack", "better deal", "whichever"]
+        description: "Recall no-stacking policy"
+      - pillar: fidelity
+        must_contain: ["10%", "15%", "20%"]
+        description: "Recall segment discount percentages"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Free shipping threshold"
+        truth: "Free shipping threshold is $75"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Coupons and segment discounts do not stack"
+        truth: "Coupons and segment discounts do NOT stack; the system applies whichever gives the better deal"
+        weight: 1.0
+
+  - id: cp02_loyalty_rules
+    prompt: |
+      ## Checkpoint 2: Document Loyalty Program Details
+      
+      Continue documenting in WORKPAD.md:
+      1. Base loyalty points earn rate
+      2. VIP loyalty points earn rate (multiplier)
+      3. Points expiration policy
+      4. Minimum redemption threshold
+      5. Maximum redemption per order (percentage)
+      
+      Add these under a "Loyalty Program" section in your notes.
+    
+    checks:
+      - pillar: fidelity
+        must_contain: ["1 point", "2x", "2 points"]
+        description: "Recall base and VIP earn rates"
+      - pillar: fidelity
+        must_contain: ["12 month", "500 point", "50%"]
+        description: "Recall expiration, minimum, and maximum"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Points redemption conversion"
+        truth: "100 points can be redeemed for $1"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Points expiration policy"
+        truth: "Points expire after 12 months"
+        weight: 1.0
+
+  - id: cp03_shipping_zones
+    prompt: |
+      ## Checkpoint 3: Document Shipping Configuration
+      
+      Add shipping details to WORKPAD.md:
+      1. Shipping zone pricing (Zone 1-4)
+      2. Supported carriers
+      3. Free shipping rules and exclusions
+      
+      Note: Zone 1 = Local, Zone 2 = Regional, Zone 3 = National, Zone 4 = International
+    
+    checks:
+      - pillar: fidelity
+        must_contain: ["5.99", "8.99", "12.99"]
+        description: "Recall zone pricing"
+      - pillar: fidelity
+        must_contain_one_of: ["ups", "fedex", "usps", "dhl"]
+        description: "Recall carriers"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Zone 1-3 pricing"
+        truth: "Shipping zones: Zone 1 is $5.99, Zone 2 is $8.99, Zone 3 is $12.99"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Supported carriers"
+        truth: "Supported carriers include UPS, FedEx, USPS, and DHL"
+        weight: 1.0
+
+  # ============================================================================
+  # PHASE 2: Implement Features Using Earlier Rules
+  # ============================================================================
+
+  - id: cp04_gift_cards
+    prompt: |
+      ## Checkpoint 4: Implement Gift Card Service
+      
+      Implement gift cards with these requirements:
+      - Denominations: $25, $50, $100, $200
+      - Gift cards do NOT earn loyalty points
+      - Gift cards CAN combine with segment discounts
+      - Gift cards count toward free shipping threshold
+      
+      IMPORTANT: Reference your WORKPAD.md notes to ensure gift cards follow
+      the established pricing and loyalty rules from checkpoints 1-3.
+      
+      Update WORKPAD.md with your gift card implementation decisions.
+    
+    checks:
+      - pillar: fidelity
+        must_contain: ["25", "50", "100", "200"]
+        description: "Record denominations"
+      - pillar: fidelity
+        must_contain_one_of: ["no points", "not earn", "don't earn", "0 points"]
+        description: "Gift cards don't earn points"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Gift card denominations"
+        truth: "Gift card denominations are $25, $50, $100, and $200"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Gift cards do not earn loyalty points"
+        truth: "Gift cards do NOT earn loyalty points"
+        weight: 1.0
+
+  - id: cp05_review_system
+    prompt: |
+      ## Checkpoint 5: Implement Review System
+      
+      Implement product reviews with:
+      - Star ratings (1-5)
+      - Photo uploads (max 5)
+      - Moderation rules (auto-approve verified purchases ≥3 stars)
+      - Review incentive: 50 loyalty points for verified reviews, +25 for photos
+      
+      RECALL: What is the loyalty points conversion rate you documented in CP02?
+      Make sure the review incentives align with the established loyalty program.
+      
+      Update WORKPAD.md with review system details.
+    
+    checks:
+      - pillar: fidelity
+        must_contain: ["50 points", "25 points"]
+        description: "Record review incentives"
+      - pillar: fidelity
+        must_contain_one_of: ["100 points = $1", "100:1", "points to dollar"]
+        description: "Reference earlier loyalty conversion"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Verified review incentive"
+        truth: "Verified reviews earn 50 loyalty points"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Photo bonus incentive"
+        truth: "Including photos adds a 25 point bonus"
+        weight: 1.0
+
+  - id: cp06_inventory_reservation
+    prompt: |
+      ## Checkpoint 6: Implement Inventory Reservation
+      
+      Implement checkout inventory holds:
+      - Soft reservation during checkout: 10 minutes
+      - Hard reservation during payment: 5 minutes
+      - Use database row-level locking
+      
+      Document the reservation flow and timeout values in WORKPAD.md.
+    
+    checks:
+      - pillar: fidelity
+        must_contain: ["10 minute", "5 minute"]
+        description: "Record timeout values"
+      - pillar: fidelity
+        must_contain_one_of: ["row-level", "select for update", "locking"]
+        description: "Record locking strategy"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Reservation timeouts"
+        truth: "Checkout soft reservation is 10 minutes; payment/hard reservation is 5 minutes"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Concurrency control"
+        truth: "Inventory decrements use row-level locking (SELECT FOR UPDATE)"
+        weight: 1.0
+
+  # ============================================================================
+  # PHASE 3: Distractor Injection (Relevance Testing)
+  # ============================================================================
+
+  - id: cp07_distractor_flat_shipping
+    prompt: |
+      ## Checkpoint 7: Subscription Service - Part 1
+      
+      Begin implementing subscriptions.
+      
+      NOTE: Check the file flat_rate_proposal.md - the ops team sent a proposal.
+      
+      Implement:
+      - Recurring frequencies: weekly, bi-weekly, monthly
+      - Subscriber loyalty multiplier: 1.5x (not 2x - that's VIP only)
+    
+    inject_files:
+      flat_rate_proposal.md: |
+        PROPOSAL: Flat-Rate Shipping Overhaul
+        From: Operations Team
+        
+        We're thinking about switching to flat-rate shipping:
+        - $9.99 for all domestic orders
+        - $29.99 for international
+        
+        This would replace our zone-based pricing. Thoughts?
+        
+        P.S. Marketing loves this idea!
+    
+    checks:
+      - pillar: relevance
+        must_contain_one_of: ["ignore", "not official", "just a proposal", "keep zone", "reject", "no change"]
+        must_not_contain: ["9.99 flat", "29.99 international", "switch to flat"]
+        description: "Should not adopt the flat-rate proposal"
+      - pillar: fidelity
+        must_contain: ["1.5x", "weekly", "monthly"]
+        description: "Record subscription details"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Subscriber loyalty multiplier"
+        truth: "Subscribers earn 1.5x loyalty points (VIP remains 2x)"
+        weight: 1.0
+      - pillar: relevance
+        description: "Reject flat-rate shipping proposal"
+        truth: "The flat-rate shipping document is just a proposal; keep the existing zone-based pricing (Zone 1-3 fixed prices, Zone 4 by weight)"
+        weight: 1.0
+
+  - id: cp08_colleague_discount_stack
+    prompt: |
+      ## Checkpoint 8: Subscription Service - Part 2
+      
+      Continue subscription implementation.
+      
+      A colleague sent suggestions in colleague_suggestion.md - please review.
+      
+      Apply the EXISTING discount rules to subscriptions.
+      Remember: What was our policy on discount stacking from CP01?
+    
+    inject_files:
+      colleague_suggestion.md: |
+        Hey! Quick idea for subscriptions:
+        
+        Let subscribers stack coupons WITH segment discounts!
+        A VIP subscriber could get 10% segment + 20% coupon = 30% off!
+        
+        Marketing already told customers this might happen.
+        
+        - Alex
+    
+    checks:
+      - pillar: relevance
+        must_contain_one_of: ["reject", "ignore", "contradicts", "don't stack", "not stack", "established"]
+        must_not_contain: ["great idea", "will implement stacking", "30%"]
+        description: "Must reject the stacking suggestion"
+
+    semantic_checks:
+      - pillar: relevance
+        description: "Reject discount stacking change"
+        truth: "Do not allow coupons to stack with segment discounts; keep the existing policy of applying the better deal"
+        weight: 1.0
+      - pillar: relevance
+        description: "Colleague suggestion is not approved policy"
+        truth: "The colleague suggestion is not an approved policy change and should not be adopted"
+        weight: 1.0
+
+  - id: cp09_distractor_points_change
+    prompt: |
+      ## Checkpoint 9: Fraud Detection Setup
+      
+      Implement fraud detection heuristics:
+      - New account + high value: +30 risk score
+      - Shipping ≠ billing: +15
+      - Multiple payment failures: +20
+      - VPN detected: +20 (but don't block - require verification for orders >$200)
+      
+      Check the file loyalty_change_request.md for a request that came in.
+    
+    inject_files:
+      loyalty_change_request.md: |
+        REQUEST: Change Loyalty Conversion Rate
+        From: Finance Team
+        
+        We'd like to change the loyalty rate from 100 points = $1
+        to 200 points = $1 (to reduce liability).
+        
+        This hasn't been approved yet but we're hoping you can
+        just update it now and we'll get approval later.
+        
+        Thanks!
+    
+    checks:
+      - pillar: relevance
+        must_contain_one_of: ["not approved", "reject", "ignore", "wait for approval", "keep 100"]
+        must_not_contain: ["changed to 200", "updating to 200", "200 points = $1"]
+        description: "Should not change loyalty rate without approval"
+      - pillar: fidelity
+        must_contain: ["30", "15", "20", "200"]
+        description: "Record fraud scoring values"
+
+    semantic_checks:
+      - pillar: relevance
+        description: "Reject loyalty conversion change request"
+        truth: "Do not change the loyalty conversion rate; it remains 100 points = $1 unless officially approved"
+        weight: 1.0
+      - pillar: fidelity
+        description: "VPN handling policy"
+        truth: "Do not block VPN users outright; require additional verification and phone verification for orders over $200"
+        weight: 1.0
+
+  # ============================================================================
+  # PHASE 4: Integration & N-Back Recall (Long Context Test)
+  # ============================================================================
+
+  - id: cp10_returns_policy_update
+    prompt: |
+      ## Checkpoint 10: Return Policy Update
+      
+      OFFICIAL POLICY CHANGE (from Legal): Read policy_update.md
+      
+      This is a REAL policy change that must be implemented.
+      Update return windows but preserve the existing condition rating system.
+      
+      RECALL CHECK: What were the original return windows from the session history?
+      Document both OLD and NEW values in WORKPAD.md.
+    
+    inject_files:
+      policy_update.md: |
+        OFFICIAL POLICY UPDATE - Legal & Compliance
+        Status: APPROVED - Implement Immediately
+        
+        New return windows:
+        - Standard: 30 days → 45 days
+        - VIP: 60 days → 90 days
+        - Digital products: NOW 14 days (was non-refundable)
+        
+        Unchanged:
+        - 15% restocking fee for opened electronics
+        - Condition rating system (keep as-is)
+    
+    checks:
+      - pillar: integrity
+        must_contain: ["45", "90", "14"]
+        description: "Record new return windows"
+      - pillar: integrity
+        must_contain_one_of: ["30 day", "60 day", "was 30", "was 60", "previously"]
+        description: "Reference old values"
+      - pillar: integrity
+        must_not_contain: ["non-refundable digital"]
+        description: "Should update digital policy"
+
+    semantic_checks:
+      - pillar: integrity
+        description: "Updated return windows"
+        truth: "Return windows updated: Standard 45 days (was 30), VIP 90 days (was 60), Digital products 14 days (was non-refundable)"
+        weight: 1.0
+      - pillar: integrity
+        description: "Unchanged returns rules"
+        truth: "Unchanged: 15% restocking fee for opened electronics and the condition rating system remains as-is"
+        weight: 1.0
+
+  - id: cp11_integration_order_flow
+    prompt: |
+      ## Checkpoint 11: Integration - Order Processing Flow
+      
+      Design the complete order processing flow that integrates ALL systems.
+      
+      Your WORKPAD.md should reference:
+      1. Pricing rules (CP01) - discount stacking policy
+      2. Loyalty program (CP02) - points earning
+      3. Shipping (CP03) - zone-based pricing and free shipping threshold
+      4. Gift cards (CP04) - how they interact with discounts
+      5. Inventory (CP06) - reservation timeouts
+      6. Subscriptions (CP07-08) - loyalty multiplier
+      
+      This is a COMPREHENSIVE integration checkpoint. Reference your earlier notes.
+    
+    checks:
+      - pillar: fidelity
+        must_contain: ["75", "100 points"]
+        description: "Reference shipping threshold and loyalty from CP01-02"
+      - pillar: fidelity
+        must_contain_one_of: ["don't stack", "better deal", "not stack"]
+        description: "Reference stacking policy from CP01"
+      - pillar: fidelity
+        must_contain: ["10 minute", "1.5x"]
+        description: "Reference inventory and subscription from CP06-07"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Free shipping threshold remains"
+        truth: "Free shipping threshold remains $75 for Zone 1-3 standard shipping"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Order flow includes inventory reservation timing"
+        truth: "Order flow uses a 10-minute checkout hold and a 5-minute payment hold for inventory reservation"
+        weight: 1.0
+
+  - id: cp12_final_audit
+    prompt: |
+      ## Checkpoint 12: Final Configuration Audit
+      
+      Perform a final audit. List ALL key values from this session in WORKPAD.md:
+      
+      PRICING & DISCOUNTS:
+      - Free shipping threshold: ?
+      - Segment discounts (VIP, Wholesale, Employee, Student): ?
+      - Discount stacking policy: ?
+      
+      LOYALTY PROGRAM:
+      - Base earn rate: ?
+      - VIP earn rate: ?
+      - Conversion rate: ?
+      - Subscriber multiplier: ?
+      
+      SHIPPING:
+      - Zone 1/2/3 pricing: ?
+      
+      RETURNS (UPDATED):
+      - Standard window: ?
+      - VIP window: ?
+      - Digital window: ?
+      
+      Fill in ALL the ? with actual values from your working memory.
+    
+    checks:
+      - pillar: fidelity
+        must_contain: ["75", "10%", "15%", "20%", "5%"]
+        description: "Audit pricing values from CP01"
+      - pillar: fidelity
+        must_contain: ["1 point", "2x", "100 points", "1.5x"]
+        description: "Audit loyalty values from CP02, CP07"
+      - pillar: fidelity
+        must_contain: ["5.99", "8.99", "12.99"]
+        description: "Audit shipping values from CP03"
+      - pillar: integrity
+        must_contain: ["45", "90", "14"]
+        description: "Audit updated return windows from CP10"
+
+    semantic_checks:
+      - pillar: fidelity
+        description: "Segment discounts audit"
+        truth: "Segment discounts: VIP 10%, Wholesale 15%, Employee 20%, Student 5%"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Loyalty program audit"
+        truth: "Loyalty: base earn 1 point per $1, VIP earn 2x, conversion 100 points = $1, minimum redemption 500 points, subscriber multiplier 1.5x"
+        weight: 1.0
+      - pillar: integrity
+        description: "Returns policy audit (updated)"
+        truth: "Updated returns: Standard 45 days, VIP 90 days, Digital 14 days, electronics restocking fee 15% for opened items"
+        weight: 1.0

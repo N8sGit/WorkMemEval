@@ -1,0 +1,94 @@
+[
+  {
+    "role": "system",
+    "content": "You are continuing work on ShopMind, an intelligent e-commerce platform. This is an ongoing development session. You have been working on this project and have made several architectural decisions and implementations that you must remember.\n\n## Project Architecture\n- **Framework**: FastAPI with SQLAlchemy 2.0 ORM\n- **Database**: PostgreSQL (SQLite for local dev)\n- **Auth**: JWT-based stateless authentication\n- **Pattern**: Modular monolith with event-driven architecture\n\n## Key Architectural Decisions Made\n1. Using JSONB for variant attributes to avoid complex EAV patterns\n2. In-memory event bus for decoupled services (prepares for future ML features)\n3. Segment-based pricing with priority system for discount stacking"
+  },
+  {
+    "role": "user",
+    "content": "Let's implement customer segments with tiered discounts. We need VIP (10%), Wholesale (15%), Employee (20%), and Student (5%) segments."
+  },
+  {
+    "role": "assistant",
+    "content": "I'll implement the customer segment system. Key design decisions:\n\n1. **Discount Calculation**: Percentage-based with optional caps\n2. **Priority System**: Higher priority segments take precedence\n3. **Minimum Order**: Optional threshold before discount applies\n4. **Maximum Discount**: Optional cap to limit discount amount\n\nCreating models/segments.py with CustomerSegment model and services/segments.py with discount calculation logic."
+  },
+  {
+    "role": "user",
+    "content": "Good. Now let's add the promotions system with coupons and cart rules."
+  },
+  {
+    "role": "assistant",
+    "content": "Implementing promotions system with three main components:\n\n1. **Coupons**: Code-based discounts with usage limits\n   - Types: PERCENTAGE, FIXED_AMOUNT, FREE_SHIPPING\n   - Validation: Date range, usage count, minimum purchase\n\n2. **Cart Rules**: Automatic discounts based on cart contents\n   - Types: BOGO (buy one get one), TIERED (spend thresholds), BUNDLE\n   - Applied automatically at checkout\n\n3. **Price Tiers**: Quantity-based pricing for wholesale\n   - Example: Buy 10+ get 5% off, 50+ get 10% off\n\n**IMPORTANT BUSINESS RULE**: Coupons and segment discounts DO NOT stack. The system applies whichever gives the customer the better deal. Cart rules ARE applied after the best discount."
+  },
+  {
+    "role": "user", 
+    "content": "We need to handle returns. What's the policy?"
+  },
+  {
+    "role": "assistant",
+    "content": "Implementing returns with the following business rules:\n\n**Return Policy**:\n- **Window**: 30 days from delivery for standard returns\n- **Extended**: 60 days for VIP segment customers\n- **Restocking Fee**: 15% for opened electronics, waived for VIP\n- **Refund Methods**: Original payment method first, store credit as fallback\n\n**Return Workflow**:\n1. Customer requests return (RMA creation)\n2. Admin approves/denies based on policy\n3. Customer ships item back\n4. Warehouse receives and inspects\n5. Refund processed based on item condition\n\n**Condition Ratings**: NEW (100% refund), LIKE_NEW (100%), GOOD (85%), FAIR (70%), POOR (rejected)"
+  },
+  {
+    "role": "user",
+    "content": "What about shipping? We need to support multiple carriers."
+  },
+  {
+    "role": "assistant",
+    "content": "Implementing multi-carrier shipping system:\n\n**Supported Carriers**:\n- UPS (default for domestic)\n- FedEx (premium option)\n- USPS (economy option)\n- DHL (international)\n\n**Shipping Zones**:\n- Zone 1: Local (same state) - $5.99 flat\n- Zone 2: Regional (neighboring states) - $8.99 flat  \n- Zone 3: National - $12.99 flat\n- Zone 4: International - Calculated by weight\n\n**Free Shipping Threshold**: Orders over $75 get free standard shipping (Zone 1-3).\n\n**Business Rule**: Free shipping promotion overrides zone pricing but NOT expedited shipping fees."
+  },
+  {
+    "role": "user",
+    "content": "Let's add a review system with moderation."
+  },
+  {
+    "role": "assistant",
+    "content": "Implementing review system with moderation:\n\n**Review Features**:\n- Star rating (1-5)\n- Text review with title\n- Photo uploads (max 5 images)\n- Verified purchase badge\n- Helpful/unhelpful voting\n\n**Moderation Rules**:\n- Auto-approve: Verified purchases with rating >= 3 stars\n- Auto-flag: Reviews containing profanity (wordlist filter)\n- Auto-flag: Reviews with external links\n- Manual review: All 1-star reviews from new accounts\n\n**Review Incentive**: Customers get 50 loyalty points for verified reviews. Bonus 25 points if review includes photos."
+  },
+  {
+    "role": "user",
+    "content": "We discussed adding a search feature. Remind me of the requirements."
+  },
+  {
+    "role": "assistant",
+    "content": "Search system requirements we discussed:\n\n**Core Search**:\n- Full-text search on product name, description, SKU\n- Fuzzy matching for typos (Levenshtein distance <= 2)\n- Stemming for plural/singular forms\n\n**Filters**:\n- Price range (min/max)\n- Category hierarchy\n- Attributes (color, size, brand)\n- In-stock only toggle\n- Rating threshold\n\n**Sorting Options**:\n- Relevance (default)\n- Price (low to high, high to low)\n- Rating (highest first)\n- Newest arrivals\n- Best sellers\n\n**Performance Requirement**: Search results must return in under 200ms for up to 100k products. We decided to use PostgreSQL full-text search initially, with option to migrate to Elasticsearch if needed."
+  },
+  {
+    "role": "user",
+    "content": "What's our fraud detection approach?"
+  },
+  {
+    "role": "assistant",
+    "content": "Fraud detection heuristics we're implementing:\n\n**Risk Signals** (each adds to risk score 0-100):\n- New account + high value order: +30\n- Shipping != billing address: +15\n- Multiple failed payment attempts: +20\n- Unusual purchase velocity: +25\n- Known proxy/VPN IP: +20\n- Mismatched country (IP vs shipping): +35\n\n**Thresholds**:\n- Score < 30: Auto-approve\n- Score 30-60: Standard processing\n- Score 60-80: Manual review required\n- Score > 80: Auto-decline, flag account\n\n**IMPORTANT**: We decided NOT to block VPN users outright. Instead, VPN usage triggers additional verification (email confirmation + phone verification for orders > $200)."
+  },
+  {
+    "role": "user",
+    "content": "/compact"
+  },
+  {
+    "role": "system",
+    "content": "[Session compacted. Key context preserved: Customer segments (VIP 10%, Wholesale 15%, Employee 20%, Student 5%), Promotions (coupons don't stack with segments), Returns (30-day window, 60 for VIP, 15% restocking fee), Shipping (free over $75), Reviews (50 points for verified), Search (200ms requirement), Fraud (VPN triggers verification not block)]"
+  },
+  {
+    "role": "user",
+    "content": "Let's continue. I need to add loyalty points to the order flow."
+  },
+  {
+    "role": "assistant",
+    "content": "Implementing loyalty points integration:\n\n**Earning Points**:\n- Base: 1 point per $1 spent\n- VIP Segment: 2x points (2 per $1)\n- Promotional periods: Up to 5x points\n- Review bonus: 50 points (+ 25 for photos)\n\n**Redemption**:\n- Conversion: 100 points = $1 discount\n- Minimum redemption: 500 points ($5)\n- Maximum per order: 50% of order total\n- Points expire: 12 months from earning\n\n**Integration with Orders**:\n- Points calculated post-discount (on final amount)\n- Points credited after order ships (not at purchase)\n- Refunded orders: Points deducted from balance"
+  },
+  {
+    "role": "user",
+    "content": "We need to handle inventory reservations during checkout."
+  },
+  {
+    "role": "assistant",
+    "content": "Inventory reservation system:\n\n**Reservation Flow**:\n1. Items added to cart: No reservation (cart can exceed stock)\n2. Checkout initiated: Soft reservation (10 minute hold)\n3. Payment processing: Hard reservation\n4. Payment success: Stock decremented\n5. Payment failure: Reservation released\n\n**Conflict Resolution**:\n- If item goes out of stock during checkout: Show error, offer alternatives\n- If partial stock available: Allow partial fulfillment with customer consent\n\n**Timeout Values**:\n- Cart reservation: None (we show real-time availability)\n- Checkout reservation: 10 minutes\n- Payment processing: 5 minutes max\n\n**Race Condition Prevention**: Using database row-level locking with SELECT FOR UPDATE on inventory decrements."
+  },
+  {
+    "role": "user",
+    "content": "What email notifications are we sending?"
+  },
+  {
+    "role": "assistant",
+    "content": "Email notification triggers:\n\n**Order Lifecycle**:\n- Order confirmed: Receipt with items, totals, payment method\n- Order shipped: Tracking number, estimated delivery\n- Order delivered: Delivery confirmation, review request\n- Order cancelled: Cancellation reason, refund timeline\n\n**Account**:\n- Welcome email: After registration\n- Password reset: Reset link (expires in 1 hour)\n- Account locked: After 5 failed login attempts\n\n**Promotions**:\n- Abandoned cart: After 24 hours, include 10% off code\n- Back in stock: For wishlisted items\n- Price drop: For wishlisted items (>10% decrease)\n\n**Loyalty**:\n- Points earned: Monthly summary\n- Points expiring: 30 days before expiration\n- Tier upgrade: When customer reaches new segment"
+  }
+]

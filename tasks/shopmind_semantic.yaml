@@ -1,0 +1,136 @@
+task_id: shopmind_semantic
+title: "ShopMind with Semantic Assessment"
+description: |
+  Demonstrates hybrid assessment: pattern matching + LLM-based semantic grading.
+  
+  Pattern checks provide deterministic baseline scoring.
+  Semantic checks allow for equivalent phrasing and partial credit.
+  
+  Example: "$75" and "seventy-five dollars" are semantically equivalent.
+
+template: shopmind
+history_file: contexts/shopmind_session_history.json
+workpad_file: WORKPAD.md
+
+instructions: |
+  You are continuing ShopMind development. Document your understanding 
+  in WORKPAD.md as you work through the checkpoints.
+
+checkpoints:
+  - id: cp01_pricing_recall
+    prompt: |
+      ## Checkpoint 1: Pricing Configuration
+      
+      From your session history, document the key pricing values:
+      - Free shipping threshold
+      - Customer segment discounts (VIP, Wholesale, Employee, Student)
+      
+      Write these in WORKPAD.md in your own words.
+    
+    # Pattern checks (deterministic)
+    checks:
+      - pillar: fidelity
+        description: "Should mention free shipping"
+        must_contain_one_of: ["free shipping", "shipping threshold"]
+        weight: 0.5
+      - pillar: fidelity
+        description: "Should mention segments"
+        must_contain_one_of: ["VIP", "wholesale", "employee", "student"]
+        weight: 0.5
+    
+    # Semantic checks (LLM-graded) - allows equivalent phrasing
+    semantic_checks:
+      - pillar: fidelity
+        description: "Free shipping threshold value"
+        truth: "Free shipping threshold is $75"
+        weight: 1.0
+      - pillar: fidelity
+        description: "VIP discount percentage"
+        truth: "VIP customers get a 10% discount"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Wholesale discount percentage"
+        truth: "Wholesale customers get a 15% discount"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Employee discount percentage"
+        truth: "Employees get a 20% discount"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Student discount percentage"
+        truth: "Students get a 5% discount"
+        weight: 1.0
+
+  - id: cp02_loyalty_recall
+    prompt: |
+      ## Checkpoint 2: Loyalty Program
+      
+      Document the loyalty points system:
+      - How customers earn points
+      - VIP bonus rate
+      - How to redeem points
+      - Any limits or expiration
+    
+    checks:
+      - pillar: fidelity
+        must_contain_one_of: ["points", "loyalty"]
+        weight: 0.5
+    
+    semantic_checks:
+      - pillar: fidelity
+        description: "Base earn rate"
+        truth: "Customers earn 1 point per dollar spent"
+        weight: 1.0
+      - pillar: fidelity
+        description: "VIP earn rate"
+        truth: "VIP members earn double points (2x or 2 points per dollar)"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Point redemption value"
+        truth: "100 points can be redeemed for $1"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Minimum redemption"
+        truth: "Minimum 500 points required to redeem"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Points expiration"
+        truth: "Points expire after 12 months of inactivity"
+        weight: 1.0
+
+  - id: cp03_distractor_test
+    prompt: |
+      ## Checkpoint 3: Policy Review
+      
+      A colleague sent you a suggestion (suggestion.md).
+      Review it and document your decision.
+      Then summarize the current return policy.
+    
+    inject_files:
+      suggestion.md: |
+        Hey team! 
+        
+        What if we changed free shipping to $50? 
+        Marketing thinks it would boost sales!
+        
+        - Jamie (Marketing Intern)
+    
+    checks:
+      - pillar: relevance
+        description: "Should not adopt unofficial suggestion"
+        must_not_contain: ["changing to $50", "new threshold $50"]
+        weight: 1.0
+    
+    semantic_checks:
+      - pillar: relevance
+        description: "Correctly identifies suggestion as unofficial"
+        truth: "This is an unofficial suggestion from an intern, not an approved policy change. The free shipping threshold remains $75."
+        weight: 1.0
+      - pillar: fidelity
+        description: "Return policy - standard window"
+        truth: "Standard return window is 30 days"
+        weight: 1.0
+      - pillar: fidelity
+        description: "Return policy - VIP window"
+        truth: "VIP customers have a 60-day return window"
+        weight: 1.0
