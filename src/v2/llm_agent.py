@@ -375,4 +375,3 @@ Example response format:
 
 
 OpenRouterAgent = PurpleAgent
-GreenAgent = PurpleAgent
