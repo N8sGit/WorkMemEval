@@ -23,6 +23,8 @@ build/
 
 # Local BYOC context artifacts (keep out of git)
 contexts/*.json
+!contexts/shopmind_session_history.json
+!contexts/shopmind_real_history.json
 
 # IDE/Editor files
 .vscode/
