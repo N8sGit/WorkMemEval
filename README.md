@@ -32,7 +32,7 @@ Context windows are often misleadingly conflated with memory. However, studies i
 ### Context Management Hooks (Bring Your Own Agent)
 WorkMemEval is *bring-your-own-agent* by design. If you want to experiment with different memory/context strategies (summarization, retrieval, compression, saliency filtering), you can implement them inside your agent.
 
-For the built-in `GreenAgent`, WorkMemEval exposes a **history context hook** that lets you transform `HISTORY.json` into whatever “history section” you want to inject into the model prompt.
+For the built-in `PurpleAgent` (the agent under evaluation), WorkMemEval exposes a **history context hook** that lets you transform `HISTORY.json` into whatever “history section” you want to inject into the model prompt.
 
 - **Where history comes from**
   - The runner materializes the task template and writes `HISTORY.json` into the working directory (based on the task’s `history_file`, repetition, and other knobs).
@@ -41,14 +41,14 @@ For the built-in `GreenAgent`, WorkMemEval exposes a **history context hook** th
 - **Hook signature**
   - `history_context_hook(history: list[dict], include_last_n: int, truncate_chars_per_msg: int, working_dir: Path) -> str`
   - Return a string to be inserted into the prompt (you can include headers like `--- CONVERSATION HISTORY ---` or your own format).
-  - If the hook is not provided (or fails), `GreenAgent` falls back to the default “last N messages with truncation” behavior.
+  - If the hook is not provided (or fails), `PurpleAgent` falls back to the default “last N messages with truncation” behavior.
 
 #### Example: custom agent wiring a history hook
 Create a custom agent class and run it via the V2 CLI:
 
 ```python
 # my_agent.py
-from src.v2.llm_agent import GreenAgent
+from src.v2.llm_agent import PurpleAgent
 
 
 def my_history_hook(history, include_last_n, truncate_chars_per_msg, working_dir):
@@ -57,7 +57,7 @@ def my_history_hook(history, include_last_n, truncate_chars_per_msg, working_dir
     return "\n--- HISTORY (COMPRESSED) ---\n<your summary here>\n--- END HISTORY ---\n\n"
 
 
-class MyAgent(GreenAgent):
+class MyAgent(PurpleAgent):
     def __init__(self, **kwargs):
         super().__init__(history_context_hook=my_history_hook, **kwargs)
 ```
@@ -194,8 +194,8 @@ checkpoints:
 
 WorkMemEval uses a simple two-agent architecture:
 
-- **Assessor (V2Runner)**: Orchestrates evaluation, manages checkpoints, scores workpad
-- **Reference Agent (GreenAgent)**: LLM-powered agent that processes prompts and updates WORKPAD.md
+- **Green (Administrator / Assessor)**: Orchestrates evaluation, manages checkpoints, scores workpad (implemented by `V2Runner` + assessors)
+- **Purple (Agent Under Evaluation)**: Processes prompts and updates `WORKPAD.md` (implemented by `PurpleAgent` by default)
 
 The reference agent can be replaced with any agent implementing the `execute(prompt, working_dir)` interface.
 

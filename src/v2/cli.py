@@ -149,7 +149,7 @@ def create_mock_agent(task):
 def create_default_agent(args):
     """Create the default agent (LLM-based if available)."""
     import os
-    from .llm_agent import GreenAgent
+    from .llm_agent import PurpleAgent
     
     # Check for API key
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -158,19 +158,19 @@ def create_default_agent(args):
         print("Note: No OPENROUTER_API_KEY set. Use --agent mock for testing.")
         return None
 
-    # Create V2 LLM-backed agent (model is optional; GreenAgent has a default)
+    # Create V2 LLM-backed agent (model is optional; PurpleAgent has a default)
     try:
         kwargs = {}
         if args.model:
             kwargs["model"] = args.model
-        return GreenAgent(
+        return PurpleAgent(
             api_key=api_key,
             max_context_messages=args.max_context_messages,
             max_context_chars=args.max_context_chars,
             **kwargs,
         )
     except Exception as e:
-        print(f"Warning: Could not create GreenAgent: {e}")
+        print(f"Warning: Could not create PurpleAgent: {e}")
         return None
 
 
