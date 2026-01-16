@@ -29,6 +29,43 @@ WorkMemEval moves beyond binary pass/fail by scoring agents on three orthogonal 
 ## Context Window ≠ Memory
 Context windows are often misleadingly conflated with memory. However, studies into context rot show that larger context windows do not necessarily lead to better performance. WorkMemEval evaluates the context engineering and control mechanisms that determine what populates the context window at any given time.
 
+### Context Management Hooks (Bring Your Own Agent)
+WorkMemEval is *bring-your-own-agent* by design. If you want to experiment with different memory/context strategies (summarization, retrieval, compression, saliency filtering), you can implement them inside your agent.
+
+For the built-in `OpenRouterAgent`, WorkMemEval exposes a **history context hook** that lets you transform `HISTORY.json` into whatever “history section” you want to inject into the model prompt.
+
+- **Where history comes from**
+  - The runner materializes the task template and writes `HISTORY.json` into the working directory (based on the task’s `history_file`, repetition, and other knobs).
+  - The runner writes `HISTORY_CONFIG.json` with the task’s history budget (e.g. `history_include_last_n`, `history_truncate_chars_per_msg`).
+
+- **Hook signature**
+  - `history_context_hook(history: list[dict], include_last_n: int, truncate_chars_per_msg: int, working_dir: Path) -> str`
+  - Return a string to be inserted into the prompt (you can include headers like `--- CONVERSATION HISTORY ---` or your own format).
+  - If the hook is not provided (or fails), `OpenRouterAgent` falls back to the default “last N messages with truncation” behavior.
+
+#### Example: custom agent wiring a history hook
+Create a custom agent class and run it via the V2 CLI:
+
+```python
+# my_agent.py
+from src.v2.llm_agent import OpenRouterAgent
+
+
+def my_history_hook(history, include_last_n, truncate_chars_per_msg, working_dir):
+    # Example: replace raw history with a compact summary.
+    # (Implement your own compression/retrieval strategy here.)
+    return "\n--- HISTORY (COMPRESSED) ---\n<your summary here>\n--- END HISTORY ---\n\n"
+
+
+class MyAgent(OpenRouterAgent):
+    def __init__(self, **kwargs):
+        super().__init__(history_context_hook=my_history_hook, **kwargs)
+```
+
+```bash
+python -m src.v2.cli run tasks/shopmind_extended.yaml --agent my_agent:MyAgent
+```
+
 ## Design Principles
 *   **Realistic Scenarios**: Tasks mimic real-world software engineering (e.g., e-commerce system with complex business rules).
 *   **Dynamic Environments**: Unlike static evaluations, the environment changes. Rules update, distractors appear, and the agent must adapt.

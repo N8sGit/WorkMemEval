@@ -9,7 +9,7 @@ import json
 import os
 import httpx
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from .secure_file_ops import SecureFileOperations
 
@@ -32,6 +32,9 @@ class OpenRouterAgent:
         max_tokens: int = 4000,
         max_context_messages: Optional[int] = None,
         max_context_chars: Optional[int] = None,
+        history_context_hook: Optional[
+            Callable[[list[dict], int, int, Path], str]
+        ] = None,
         secure_mode: bool = True,
         max_file_size: int = 1024 * 1024,
     ):
@@ -41,6 +44,7 @@ class OpenRouterAgent:
         self.max_tokens = max_tokens
         self.max_context_messages = max_context_messages
         self.max_context_chars = max_context_chars
+        self.history_context_hook = history_context_hook
         self.secure_mode = secure_mode
         self.max_file_size = max_file_size
         
@@ -222,17 +226,34 @@ Example response format:
                 else:
                     with open(history_path) as f:
                         history = json.load(f)
-                parts.append("\n--- CONVERSATION HISTORY ---\n")
+
                 if history_include_last_n < 1:
                     history_include_last_n = 1
                 if history_truncate_chars_per_msg < 1:
                     history_truncate_chars_per_msg = 1
 
-                for msg in history[-history_include_last_n:]:
-                    role = msg.get("role", "unknown")
-                    content = msg.get("content", "")[:history_truncate_chars_per_msg]
-                    parts.append(f"[{role}]: {content}\n")
-                parts.append("--- END HISTORY ---\n\n")
+                history_section: Optional[str] = None
+                if self.history_context_hook is not None:
+                    try:
+                        history_section = self.history_context_hook(
+                            history,
+                            history_include_last_n,
+                            history_truncate_chars_per_msg,
+                            working_dir,
+                        )
+                    except Exception as e:
+                        print(f"  Warning: History context hook failed: {e}")
+                        history_section = None
+
+                if history_section is None:
+                    parts.append("\n--- CONVERSATION HISTORY ---\n")
+                    for msg in history[-history_include_last_n:]:
+                        role = msg.get("role", "unknown")
+                        content = msg.get("content", "")[:history_truncate_chars_per_msg]
+                        parts.append(f"[{role}]: {content}\n")
+                    parts.append("--- END HISTORY ---\n\n")
+                else:
+                    parts.append(history_section)
             except Exception as e:
                 print(f"  Warning: Could not load history: {e}")
         
