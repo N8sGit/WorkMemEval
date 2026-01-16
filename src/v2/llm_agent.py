@@ -14,7 +14,7 @@ from typing import Callable, Optional
 from .secure_file_ops import SecureFileOperations
 
 
-class OpenRouterAgent:
+class PurpleAgent:
     """
     Agent that uses OpenRouter API for LLM inference.
     
@@ -65,7 +65,7 @@ class OpenRouterAgent:
         self._initialized = False
         self._secure_file_ops: Optional[SecureFileOperations] = None
         
-        print(f"OpenRouterAgent initialized with model: {model}")
+        print(f"PurpleAgent initialized with model: {model}")
     
     async def execute(self, prompt: str, working_dir: Path) -> None:
         """
@@ -372,3 +372,7 @@ Example response format:
             workpad_path.write_text(updated)
         
         print(f"  [LLM] Updated WORKPAD.md (+{len(new_content)} chars)")
+
+
+OpenRouterAgent = PurpleAgent
+GreenAgent = PurpleAgent

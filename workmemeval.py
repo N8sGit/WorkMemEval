@@ -29,7 +29,7 @@ load_dotenv()
 def cmd_run(args):
     """Run evaluation with LLM-powered agent."""
     from src.v2 import load_task, V2Runner
-    from src.v2.llm_agent import OpenRouterAgent
+    from src.v2.llm_agent import PurpleAgent
     
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
@@ -68,7 +68,7 @@ def cmd_run(args):
     
     async def _run():
         task = load_task(task_path)
-        agent = OpenRouterAgent(
+        agent = PurpleAgent(
             model=args.model,
             api_key=api_key,
             max_context_messages=args.max_context_messages,
