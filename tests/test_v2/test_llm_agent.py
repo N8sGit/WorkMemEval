@@ -1,11 +1,11 @@
 import pytest
 
-from src.v2.llm_agent import OpenRouterAgent
+from src.v2.llm_agent import GreenAgent
 
 
 @pytest.mark.asyncio
 async def test_openrouter_agent_prunes_messages_keeps_system(tmp_path, monkeypatch):
-    agent = OpenRouterAgent(
+    agent = GreenAgent(
         api_key="test-key",
         model="test-model",
         max_context_messages=5,
@@ -25,7 +25,7 @@ async def test_openrouter_agent_prunes_messages_keeps_system(tmp_path, monkeypat
 
 @pytest.mark.asyncio
 async def test_openrouter_agent_prunes_by_char_budget(tmp_path, monkeypatch):
-    agent = OpenRouterAgent(
+    agent = GreenAgent(
         api_key="test-key",
         model="test-model",
         max_context_chars=300,
@@ -45,7 +45,7 @@ async def test_openrouter_agent_prunes_by_char_budget(tmp_path, monkeypatch):
 
 
 def test_openrouter_agent_build_prompt_includes_default_history(tmp_path):
-    agent = OpenRouterAgent(
+    agent = GreenAgent(
         api_key="test-key",
         model="test-model",
     )
@@ -83,7 +83,7 @@ def test_openrouter_agent_history_context_hook_overrides_history(tmp_path):
         calls["last"] = (len(history), include_last_n, truncate_chars_per_msg, working_dir)
         return "\n--- HOOKED HISTORY ---\nOK\n--- END HOOKED HISTORY ---\n\n"
 
-    agent = OpenRouterAgent(
+    agent = GreenAgent(
         api_key="test-key",
         model="test-model",
         history_context_hook=hook,
