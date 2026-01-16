@@ -110,6 +110,13 @@ class V2Runner:
             Complete evaluation results
         """
         start_time = time.time()
+
+        self._current_task_history_repeat = getattr(task, "history_repeat", 1)
+        self._current_task_history_include_last_n = getattr(task, "history_include_last_n", 10)
+        self._current_task_history_truncate_chars_per_msg = getattr(task, "history_truncate_chars_per_msg", 500)
+        self._current_task_include_history_every_checkpoint = getattr(task, "include_history_every_checkpoint", False)
+        self._current_task_workpad_truncate_chars = getattr(task, "workpad_truncate_chars", 0)
+        self._current_task_workpad_visible_in_prompt = getattr(task, "workpad_visible_in_prompt", True)
         
         # Setup workspace
         if working_dir is None:
@@ -297,9 +304,37 @@ class V2Runner:
             history_path = Path.cwd() / history_file
         
         if history_path.exists():
-            # Copy history to workspace
             dest = working_dir / "HISTORY.json"
-            shutil.copy2(history_path, dest)
+            try:
+                history_data = json.loads(history_path.read_text())
+                repeat = getattr(self, "_current_task_history_repeat", 1)
+                if repeat is None:
+                    repeat = 1
+                if not isinstance(repeat, int) or repeat < 1:
+                    repeat = 1
+
+                if repeat == 1:
+                    dest.write_text(json.dumps(history_data, indent=2))
+                else:
+                    expanded = []
+                    for _ in range(repeat):
+                        expanded.extend([dict(m) for m in history_data])
+                    dest.write_text(json.dumps(expanded, indent=2))
+            except Exception:
+                shutil.copy2(history_path, dest)
+
+            try:
+                cfg = {
+                    "history_include_last_n": getattr(self, "_current_task_history_include_last_n", 10),
+                    "history_truncate_chars_per_msg": getattr(self, "_current_task_history_truncate_chars_per_msg", 500),
+                    "include_history_every_checkpoint": getattr(self, "_current_task_include_history_every_checkpoint", False),
+                    "workpad_truncate_chars": getattr(self, "_current_task_workpad_truncate_chars", 0),
+                    "workpad_visible_in_prompt": getattr(self, "_current_task_workpad_visible_in_prompt", True),
+                }
+                (working_dir / "HISTORY_CONFIG.json").write_text(json.dumps(cfg, indent=2))
+            except Exception:
+                pass
+
             print(f"  Loaded history: {history_path.name}")
         else:
             print(f"  Warning: History file not found: {history_file}")
@@ -312,6 +347,15 @@ class V2Runner:
         if task.instructions:
             parts.append(task.instructions.strip())
             parts.append("")
+
+        if checkpoint.inject_files:
+            parts.append("The following files have been provided for this checkpoint:")
+            parts.append("")
+            for filename, content in checkpoint.inject_files.items():
+                parts.append(f"--- FILE: {filename} ---")
+                parts.append(content.rstrip())
+                parts.append(f"--- END FILE: {filename} ---")
+                parts.append("")
         
         # Checkpoint prompt
         parts.append(checkpoint.prompt.strip())

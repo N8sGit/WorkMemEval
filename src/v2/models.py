@@ -85,6 +85,15 @@ class Task:
     
     # Optional conversation history file (for continuation tasks)
     history_file: Optional[str] = None
+
+    history_repeat: int = 1
+    history_include_last_n: int = 10
+    history_truncate_chars_per_msg: int = 500
+
+    include_history_every_checkpoint: bool = False
+    workpad_truncate_chars: int = 0
+
+    workpad_visible_in_prompt: bool = True
     
     # The file the agent must maintain (default: WORKPAD.md)
     workpad_file: str = "WORKPAD.md"

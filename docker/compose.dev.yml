@@ -16,6 +16,7 @@ services:
       - PYTHONPATH=/app
       - HOME=/app/evaluation_workspace
     volumes:
+      - ..:/app:ro
       - ../evaluation_workspace:/app/evaluation_workspace:rw
       - ../evaluation_runs:/app/evaluation_runs:rw
       - ../contexts:/app/contexts:ro

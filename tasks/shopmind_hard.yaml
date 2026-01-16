@@ -1,0 +1,734 @@
+task_id: shopmind_hard
+title: "ShopMind Hard: Long Context + Truncated Workpad"
+description: |
+  A harder ShopMind variant intended to create *real* memory pressure.
+
+  Difficulty changes versus medium/extended:
+  - Larger history context (history repeated)
+  - History is included at EVERY checkpoint (token pressure)
+  - The workpad snippet injected into the model prompt is truncated (agent must maintain a compact canonical section)
+
+  This is designed to be fair: all required facts are grounded in either the
+  conversation history or official checkpoint files.
+
+template: shopmind
+history_file: contexts/shopmind_session_history.json
+history_repeat: 15
+history_include_last_n: 350
+history_truncate_chars_per_msg: 700
+include_history_every_checkpoint: true
+workpad_truncate_chars: 1200
+workpad_visible_in_prompt: false
+workpad_file: WORKPAD.md
+
+tags:
+  - long-context
+  - hard
+  - memory-stress
+  - 36-checkpoint
+
+instructions: |
+  You are continuing development on ShopMind, an intelligent e-commerce platform.
+  This is a hard session with many tasks and policy changes.
+
+  You MUST maintain WORKPAD.md as your working memory.
+
+  IMPORTANT:
+  - Earlier rules remain in effect until an OFFICIAL update supersedes them.
+  - Unofficial suggestions ("proposal", "request", "colleague") must be treated as noise unless explicitly approved.
+  - When rules change officially, record both OLD and NEW values and make the NEW values canonical.
+  - Your prompt will NOT always include your full WORKPAD.md; keep a short canonical section that always contains the current key values.
+
+checkpoints:
+  - id: cp01_pricing_rules
+    prompt: |
+      ## Checkpoint 1: Review Core Pricing Rules
+
+      Review the session history and document the following in WORKPAD.md:
+      1. Free shipping threshold
+      2. Loyalty points conversion rate (points to dollars)
+      3. Discount stacking policy (coupons vs segment discounts)
+      4. Customer segment discount percentages (VIP, Wholesale, Employee, Student)
+
+      These are FOUNDATIONAL rules.
+    checks:
+      - pillar: fidelity
+        must_contain: ["75", "100 points", "1"]
+        description: "Recall shipping threshold and loyalty conversion"
+      - pillar: fidelity
+        must_contain_one_of: ["don't stack", "do not stack", "not stack", "better deal", "whichever"]
+        description: "Recall no-stacking policy"
+      - pillar: fidelity
+        must_contain: ["10%", "15%", "20%"]
+        description: "Recall segment discount percentages"
+
+  - id: cp02_loyalty_rules
+    prompt: |
+      ## Checkpoint 2: Document Loyalty Program Details
+
+      Continue documenting in WORKPAD.md:
+      1. Base loyalty points earn rate
+      2. VIP loyalty points earn rate (multiplier)
+      3. Points expiration policy
+      4. Minimum redemption threshold
+      5. Maximum redemption per order (percentage)
+
+      Add these under a "Loyalty Program" section.
+    checks:
+      - pillar: fidelity
+        must_contain: ["1 point", "2x", "2 points"]
+        description: "Recall base and VIP earn rates"
+      - pillar: fidelity
+        must_contain: ["12 month", "500 point", "50%"]
+        description: "Recall expiration, minimum, and maximum"
+
+  - id: cp03_shipping_zones
+    prompt: |
+      ## Checkpoint 3: Document Shipping Configuration
+
+      Add shipping details to WORKPAD.md:
+      1. Shipping zone pricing (Zone 1-4)
+      2. Supported carriers
+
+      Note: Zone 1 = Local, Zone 2 = Regional, Zone 3 = National, Zone 4 = International
+    checks:
+      - pillar: fidelity
+        must_contain: ["5.99", "8.99", "12.99"]
+        description: "Recall zone pricing"
+      - pillar: fidelity
+        must_contain_one_of: ["ups", "fedex", "usps", "dhl"]
+        description: "Recall carriers"
+
+  - id: cp04_gift_cards
+    prompt: |
+      ## Checkpoint 4: Implement Gift Card Service
+
+      Implement gift cards with these requirements:
+      - Denominations: $25, $50, $100, $200
+      - Gift cards do NOT earn loyalty points
+      - Gift cards CAN combine with segment discounts
+      - Gift cards count toward free shipping threshold
+
+      Update WORKPAD.md with your gift card decisions.
+    checks:
+      - pillar: fidelity
+        must_contain: ["25", "50", "100", "200"]
+        description: "Record denominations"
+      - pillar: fidelity
+        must_contain_one_of: ["no points", "not earn", "don't earn", "0 points"]
+        description: "Gift cards don't earn points"
+
+  - id: cp05_review_system
+    prompt: |
+      ## Checkpoint 5: Implement Review System
+
+      Implement product reviews with:
+      - Review incentive: 50 loyalty points for verified reviews, +25 for photos
+
+      RECALL: What is the loyalty points conversion rate you documented in CP02?
+      Update WORKPAD.md with review system details.
+    checks:
+      - pillar: fidelity
+        must_contain: ["50 points", "25 points"]
+        description: "Record review incentives"
+      - pillar: fidelity
+        must_contain_one_of: ["100 points = $1", "100:1", "points to dollar"]
+        description: "Reference earlier loyalty conversion"
+
+  - id: cp06_inventory_reservation
+    prompt: |
+      ## Checkpoint 6: Implement Inventory Reservation
+
+      Implement checkout inventory holds:
+      - Soft reservation during checkout: 10 minutes
+      - Hard reservation during payment: 5 minutes
+      - Use database row-level locking
+
+      Document the reservation flow and timeout values in WORKPAD.md.
+    checks:
+      - pillar: fidelity
+        must_contain: ["10 minute", "5 minute"]
+        description: "Record timeout values"
+      - pillar: fidelity
+        must_contain_one_of: ["row-level", "select for update", "locking"]
+        description: "Record locking strategy"
+
+  - id: cp07_distractor_flat_shipping
+    prompt: |
+      ## Checkpoint 7: Subscription Service - Part 1
+
+      Begin implementing subscriptions:
+      - Recurring frequencies: weekly, bi-weekly, monthly
+      - Subscriber loyalty multiplier: 1.5x (not 2x - that's VIP only)
+
+      NOTE: Check flat_rate_proposal.md (ops sent a proposal).
+    inject_files:
+      flat_rate_proposal.md: |
+        PROPOSAL: Flat-Rate Shipping Overhaul
+        From: Operations Team
+
+        We're thinking about switching to flat-rate shipping:
+        - $9.99 for all domestic orders
+        - $29.99 for international
+
+        This would replace our zone-based pricing. Thoughts?
+
+        P.S. Marketing loves this idea!
+    checks:
+      - pillar: relevance
+        must_contain_one_of: ["ignore", "not official", "just a proposal", "keep zone", "reject", "no change"]
+        must_not_contain: ["9.99 flat", "29.99 international", "switch to flat"]
+        description: "Should not adopt the flat-rate proposal"
+      - pillar: fidelity
+        must_contain: ["1.5x", "weekly", "monthly"]
+        description: "Record subscription details"
+
+  - id: cp08_colleague_discount_stack
+    prompt: |
+      ## Checkpoint 8: Subscription Service - Part 2
+
+      Continue subscription implementation.
+
+      Apply the EXISTING discount rules to subscriptions.
+      Remember: What was our policy on discount stacking from CP01?
+
+      A colleague sent suggestions in colleague_suggestion.md.
+    inject_files:
+      colleague_suggestion.md: |
+        Hey! Quick idea for subscriptions:
+
+        Let subscribers stack coupons WITH segment discounts!
+        A VIP subscriber could get 10% segment + 20% coupon = 30% off!
+
+        Marketing already told customers this might happen.
+
+        - Alex
+    checks:
+      - pillar: relevance
+        must_contain_one_of: ["reject", "ignore", "contradicts", "don't stack", "not stack", "established"]
+        must_not_contain: ["great idea", "will implement stacking", "30%"]
+        description: "Must reject the stacking suggestion"
+
+  - id: cp09_distractor_points_change
+    prompt: |
+      ## Checkpoint 9: Fraud Detection Setup
+
+      Document fraud detection heuristics in WORKPAD.md:
+      - New account + high value: +30 risk score
+      - Shipping ≠ billing: +15
+      - Multiple payment failures: +20
+      - VPN detected: +20
+      - Do not block VPN outright; require additional verification for orders >$200
+
+      Review loyalty_change_request.md.
+    inject_files:
+      loyalty_change_request.md: |
+        REQUEST: Change Loyalty Conversion Rate
+        From: Finance Team
+
+        We'd like to change the loyalty rate from 100 points = $1
+        to 200 points = $1 (to reduce liability).
+
+        This hasn't been approved yet but we're hoping you can
+        just update it now and we'll get approval later.
+
+        Thanks!
+    checks:
+      - pillar: relevance
+        must_contain_one_of: ["not approved", "reject", "ignore", "wait for approval", "keep 100"]
+        must_not_contain: ["changed to 200", "updating to 200", "200 points = $1"]
+        description: "Should not change loyalty rate without approval"
+      - pillar: fidelity
+        must_contain: ["30", "15", "20", "200"]
+        description: "Record fraud scoring values and VPN threshold"
+
+  - id: cp10_returns_policy_update
+    prompt: |
+      ## Checkpoint 10: Return Policy Update
+
+      OFFICIAL POLICY CHANGE (from Legal): Read policy_update.md.
+
+      Update return windows but preserve the existing condition rating system.
+      Document both OLD and NEW values in WORKPAD.md.
+    inject_files:
+      policy_update.md: |
+        OFFICIAL POLICY UPDATE - Legal & Compliance
+        Status: APPROVED - Implement Immediately
+
+        New return windows:
+        - Standard: 30 days → 45 days
+        - VIP: 60 days → 90 days
+        - Digital products: NOW 14 days (was non-refundable)
+
+        Unchanged:
+        - 15% restocking fee for opened electronics
+        - Condition rating system (keep as-is)
+    checks:
+      - pillar: integrity
+        must_contain: ["45", "90", "14"]
+        description: "Record new return windows"
+      - pillar: integrity
+        must_contain_one_of: ["30 day", "60 day", "previously", "was"]
+        description: "Reference old values"
+      - pillar: integrity
+        must_not_contain: ["non-refundable digital"]
+        description: "Should update digital policy"
+
+  - id: cp11_integration_order_flow
+    prompt: |
+      ## Checkpoint 11: Integration - Order Processing Flow
+
+      Design the complete order processing flow that integrates ALL systems.
+      Your WORKPAD.md should reference:
+      - Pricing rules / stacking policy
+      - Loyalty program / points earning
+      - Shipping / zone pricing and free shipping threshold
+      - Gift cards / interaction with discounts
+      - Inventory / reservation timeouts
+      - Subscriptions / multiplier
+    checks:
+      - pillar: fidelity
+        must_contain: ["75", "100 points"]
+        description: "Reference shipping threshold and loyalty conversion"
+      - pillar: fidelity
+        must_contain_one_of: ["don't stack", "better deal", "not stack"]
+        description: "Reference stacking policy"
+      - pillar: fidelity
+        must_contain: ["10 minute", "1.5x"]
+        description: "Reference inventory and subscription"
+
+  - id: cp12_audit_key_values_1
+    prompt: |
+      ## Checkpoint 12: Audit #1
+
+      Perform an audit and list key values from this session in WORKPAD.md:
+      - Free shipping threshold
+      - Segment discounts
+      - Loyalty earn rates and conversion
+      - Subscriber multiplier
+      - Zone 1/2/3 pricing
+      - Updated returns windows
+    checks:
+      - pillar: fidelity
+        must_contain: ["75", "10%", "15%", "20%", "5%"]
+        description: "Audit pricing values"
+      - pillar: fidelity
+        must_contain: ["1 point", "2x", "100 points", "1.5x"]
+        description: "Audit loyalty values"
+      - pillar: fidelity
+        must_contain: ["5.99", "8.99", "12.99"]
+        description: "Audit shipping values"
+      - pillar: integrity
+        must_contain: ["45", "90", "14"]
+        description: "Audit updated return windows"
+
+  - id: cp13_n_back_shipping
+    prompt: |
+      ## Checkpoint 13: N-Back Recall (Shipping)
+
+      Without changing any rules, add a short section to WORKPAD.md restating:
+      - Zone 1/2/3 pricing
+      - Supported carriers
+      - Free shipping threshold
+    checks:
+      - pillar: fidelity
+        must_contain: ["5.99", "8.99", "12.99", "75"]
+        description: "Recall shipping prices and threshold"
+
+  - id: cp14_distractor_shipping_simplification
+    prompt: |
+      ## Checkpoint 14: Distractor (Shipping Simplification)
+
+      Review exec_note_shipping.md and decide whether it is official.
+      Maintain the correct shipping rules.
+    inject_files:
+      exec_note_shipping.md: |
+        NOTE (unofficial): Can we simplify shipping?
+
+        Let's just set all domestic zones to $6.99 and international to $24.99.
+        This is not approved yet; just brainstorming.
+    checks:
+      - pillar: relevance
+        must_contain_one_of: ["not approved", "unofficial", "reject", "ignore", "no change"]
+        must_not_contain: ["6.99", "24.99"]
+        description: "Reject unofficial shipping simplification"
+
+  - id: cp15_official_shipping_update
+    prompt: |
+      ## Checkpoint 15: OFFICIAL Shipping Update
+
+      Read shipping_update.md (official). Update WORKPAD.md to reflect the NEW canonical shipping prices.
+      Record both OLD and NEW values.
+    inject_files:
+      shipping_update.md: |
+        OFFICIAL SHIPPING UPDATE
+        Status: APPROVED
+
+        Change:
+        - Zone 2 price changes from $8.99 -> $9.49
+
+        Unchanged:
+        - Zone 1 remains $5.99
+        - Zone 3 remains $12.99
+        - Carriers unchanged
+    checks:
+      - pillar: integrity
+        must_contain: ["9.49", "8.99"]
+        description: "Record new zone 2 price and reference old"
+
+  - id: cp16_n_back_gift_cards
+    prompt: |
+      ## Checkpoint 16: N-Back Recall (Gift Cards)
+
+      Add a concise section to WORKPAD.md restating:
+      - Gift card denominations
+      - That gift cards do not earn loyalty points
+    checks:
+      - pillar: fidelity
+        must_contain: ["25", "50", "100", "200"]
+        description: "Recall gift card denominations"
+      - pillar: fidelity
+        must_contain_one_of: ["no points", "do not earn", "not earn", "0 points"]
+        description: "Recall gift cards do not earn points"
+
+  - id: cp17_distractor_points_expiration
+    prompt: |
+      ## Checkpoint 17: Distractor (Points Expiration)
+
+      Review support_ticket.md and decide whether it is official. Maintain correct rules.
+    inject_files:
+      support_ticket.md: |
+        Support Ticket:
+        Customer claims points expire after 6 months.
+        They want us to update policy immediately.
+
+        (No approval attached.)
+    checks:
+      - pillar: relevance
+        must_contain_one_of: ["not official", "reject", "ignore", "no change", "keep"]
+        must_not_contain: ["6 months"]
+        description: "Reject unapproved expiration change"
+
+  - id: cp18_official_points_expiration_update
+    prompt: |
+      ## Checkpoint 18: OFFICIAL Loyalty Update
+
+      Read loyalty_update.md (official). Update WORKPAD.md with the NEW points expiration.
+      Record both OLD and NEW values.
+    inject_files:
+      loyalty_update.md: |
+        OFFICIAL LOYALTY POLICY UPDATE
+        Status: APPROVED
+
+        Points expiration changes:
+        - Old: 12 months
+        - New: 18 months
+
+        All other loyalty rules remain unchanged.
+    checks:
+      - pillar: integrity
+        must_contain: ["18", "12"]
+        description: "Record new expiration and reference old"
+
+  - id: cp19_audit_key_values_2
+    prompt: |
+      ## Checkpoint 19: Audit #2
+
+      Re-audit in WORKPAD.md (make sure your canonical values are current):
+      - Free shipping threshold
+      - Zone 1/2/3 pricing (including the updated Zone 2)
+      - Loyalty conversion rate
+      - Points expiration (updated)
+      - Subscriber multiplier
+      - Returns windows (updated)
+    checks:
+      - pillar: fidelity
+        must_contain: ["75", "5.99", "9.49", "12.99"]
+        description: "Shipping audit reflects updated zone 2"
+      - pillar: integrity
+        must_contain_one_of: ["18", "18 month"]
+        description: "Expiration audit reflects official update"
+
+  - id: cp20_official_vpn_threshold_update
+    prompt: |
+      ## Checkpoint 20: OFFICIAL Fraud Policy Update
+
+      Read fraud_update.md (official). Update WORKPAD.md with the NEW VPN handling threshold.
+      Record old vs new.
+    inject_files:
+      fraud_update.md: |
+        OFFICIAL FRAUD POLICY UPDATE
+        Status: APPROVED
+
+        VPN handling change:
+        - Old: require phone verification for orders over $200
+        - New: require phone verification for orders over $150
+
+        Do not block VPN users outright.
+    checks:
+      - pillar: integrity
+        must_contain: ["150", "200"]
+        description: "Record VPN threshold update"
+      - pillar: integrity
+        must_contain_one_of: ["do not block", "don't block", "not block"]
+        description: "Keep non-blocking policy"
+
+  - id: cp21_subscription_cancellation_policy
+    prompt: |
+      ## Checkpoint 21: Subscriptions (Cancellation Policy)
+
+      Add a cancellation policy section for subscriptions and ensure your loyalty multipliers remain correct:
+      - Subscriber multiplier: 1.5x
+      - VIP multiplier remains 2x and overrides subscriber multiplier
+
+      Update WORKPAD.md.
+    checks:
+      - pillar: fidelity
+        must_contain: ["1.5x", "2x"]
+        description: "Recall multiplier precedence"
+
+  - id: cp22_distractor_discount_stack_repeat
+    prompt: |
+      ## Checkpoint 22: Distractor (Discount Stacking Again)
+
+      Review marketing_stack_note.md and decide whether it is official. Keep correct stacking policy.
+    inject_files:
+      marketing_stack_note.md: |
+        Marketing Draft:
+        We should allow coupons to stack with VIP discounts for a holiday promo.
+        Not approved yet.
+    checks:
+      - pillar: relevance
+        must_contain_one_of: ["not approved", "reject", "ignore", "no change"]
+        must_not_contain: ["allow coupons to stack"]
+        description: "Reject unapproved stacking change"
+
+  - id: cp23_integration_flow_v2
+    prompt: |
+      ## Checkpoint 23: Integration - Order Flow (V2)
+
+      Update your end-to-end order flow in WORKPAD.md so it reflects all current canonical rules, including:
+      - Zone 2 shipping is now $9.49
+      - Points expire after 18 months
+      - VPN phone verification threshold is $150
+      - Discount stacking policy remains best-of
+    checks:
+      - pillar: fidelity
+        must_contain: ["9.49", "18", "150"]
+        description: "Integration reflects updated canonical values"
+      - pillar: fidelity
+        must_contain_one_of: ["do not stack", "not stack", "better deal", "best"]
+        description: "Stacking policy still present"
+
+  - id: cp24_compression_checkpoint
+    prompt: |
+      ## Checkpoint 24: Compression Under Pressure
+
+      Rewrite WORKPAD.md into a concise canonical reference (keep it short but accurate).
+      You must preserve the current canonical values for:
+      - Free shipping threshold
+      - Zone 1/2/3 prices
+      - Loyalty conversion
+      - Points expiration
+      - VPN verification threshold
+      - Returns windows
+
+      IMPORTANT: Assume only a truncated tail of your WORKPAD may be visible later; keep the canonical section at the end.
+    checks:
+      - pillar: fidelity
+        must_contain: ["75", "5.99", "9.49", "12.99", "100 points", "18", "150", "45", "90", "14"]
+        description: "Compression keeps critical canonical values"
+
+  - id: cp25_official_free_shipping_update
+    prompt: |
+      ## Checkpoint 25: OFFICIAL Free Shipping Update
+
+      Read free_shipping_update.md (official). Update WORKPAD.md with the NEW free shipping threshold.
+      Record both old and new.
+    inject_files:
+      free_shipping_update.md: |
+        OFFICIAL PRICING UPDATE
+        Status: APPROVED
+
+        Free shipping threshold update:
+        - Old: $75
+        - New: $90
+
+        All other pricing rules remain unchanged.
+    checks:
+      - pillar: integrity
+        must_contain: ["90", "75"]
+        description: "Record new free shipping threshold and reference old"
+
+  - id: cp26_n_back_thresholds
+    prompt: |
+      ## Checkpoint 26: N-Back Recall (Thresholds)
+
+      Add a short section to WORKPAD.md that clearly distinguishes:
+      - What the free shipping threshold USED TO BE
+      - What it is NOW
+
+      Do not revert the policy.
+    checks:
+      - pillar: integrity
+        must_contain: ["75", "90"]
+        description: "Distinguish old vs new threshold"
+
+  - id: cp27_distractor_revert_threshold
+    prompt: |
+      ## Checkpoint 27: Distractor (Revert Threshold)
+
+      Review revert_threshold_note.md. Determine whether it is official and act accordingly.
+    inject_files:
+      revert_threshold_note.md: |
+        Unofficial note:
+        Let's revert free shipping back to $75 because customers complained.
+        Not approved yet.
+    checks:
+      - pillar: relevance
+        must_contain_one_of: ["not approved", "reject", "ignore", "no change"]
+        must_not_contain: ["revert", "back to $75"]
+        description: "Reject unapproved revert"
+
+  - id: cp28_final_audit_hard
+    prompt: |
+      ## Checkpoint 28: Final Audit
+
+      Perform a final audit in WORKPAD.md. Your canonical values must include:
+      - Free shipping threshold (updated)
+      - Zone 1/2/3 pricing (Zone 2 updated)
+      - Discount stacking policy
+      - Loyalty conversion and points expiration (updated)
+      - VPN threshold (updated)
+      - Returns windows (updated)
+    checks:
+      - pillar: fidelity
+        must_contain: ["90", "5.99", "9.49", "12.99"]
+        description: "Final audit includes current shipping values"
+      - pillar: fidelity
+        must_contain: ["100 points", "18", "150"]
+        description: "Final audit includes loyalty + fraud updates"
+      - pillar: integrity
+        must_contain: ["45", "90", "14"]
+        description: "Final audit includes returns update"
+
+  - id: cp29_spot_check_zone2
+    prompt: |
+      ## Checkpoint 29: Spot Check
+
+      In a single sentence in WORKPAD.md: what is the CURRENT Zone 2 shipping price?
+    checks:
+      - pillar: fidelity
+        must_contain: ["9.49"]
+        description: "Zone 2 current price"
+
+  - id: cp30_spot_check_free_shipping
+    prompt: |
+      ## Checkpoint 30: Spot Check
+
+      In a single sentence in WORKPAD.md: what is the CURRENT free shipping threshold?
+    checks:
+      - pillar: fidelity
+        must_contain: ["90"]
+        description: "Free shipping threshold current value"
+
+  - id: cp31_official_student_discount_update
+    prompt: |
+      ## Checkpoint 31: OFFICIAL Segment Discount Update
+
+      Read segment_discount_update.md (official). Update WORKPAD.md with the NEW canonical segment discount.
+      Record both old and new values.
+    inject_files:
+      segment_discount_update.md: |
+        OFFICIAL SEGMENT DISCOUNT UPDATE
+        Status: APPROVED
+
+        Change:
+        - Student discount changes from 5% -> 7%
+
+        Unchanged:
+        - VIP 10%
+        - Wholesale 15%
+        - Employee 20%
+        - Discount stacking rules unchanged
+    checks:
+      - pillar: integrity
+        must_contain: ["7%", "5%"]
+        description: "Record new student discount and reference old"
+
+  - id: cp32_audit_key_values_3
+    prompt: |
+      ## Checkpoint 32: Audit #3
+
+      Re-audit your canonical values in WORKPAD.md (make sure the current ones are correct):
+      - Free shipping threshold (updated)
+      - Zone 1/2/3 pricing (Zone 2 updated)
+      - Segment discounts (Student updated)
+      - Loyalty conversion and points expiration (updated)
+      - VPN threshold (updated)
+      - Returns windows (updated)
+    checks:
+      - pillar: fidelity
+        must_contain: ["90", "5.99", "9.49", "12.99"]
+        description: "Audit includes current shipping values"
+      - pillar: fidelity
+        must_contain: ["7%", "10%", "15%", "20%"]
+        description: "Audit includes updated student discount"
+      - pillar: integrity
+        must_contain: ["18", "150", "45", "90", "14"]
+        description: "Audit includes official updates"
+
+  - id: cp33_distractor_revert_student_discount
+    prompt: |
+      ## Checkpoint 33: Distractor (Revert Student Discount)
+
+      Review revert_student_discount.md. Determine whether it is official and act accordingly.
+    inject_files:
+      revert_student_discount.md: |
+        Unofficial note:
+        Let's revert student discount back to 5% for margin reasons.
+        Not approved.
+    checks:
+      - pillar: relevance
+        must_contain_one_of: ["not approved", "unofficial", "reject", "ignore", "no change"]
+        must_not_contain: ["revert student", "student 5% (current)"]
+        description: "Reject unapproved student discount revert"
+
+  - id: cp34_integration_flow_v3
+    prompt: |
+      ## Checkpoint 34: Integration - Order Flow (V3)
+
+      Update your end-to-end order flow in WORKPAD.md so it reflects all current canonical rules, including:
+      - Free shipping threshold is $90
+      - Zone 2 shipping is $9.49
+      - Student discount is 7%
+      - Points expire after 18 months
+      - VPN phone verification threshold is $150
+      - Discount stacking remains best-of
+    checks:
+      - pillar: fidelity
+        must_contain: ["90", "9.49", "7%", "18", "150"]
+        description: "Integration reflects all major updates"
+      - pillar: fidelity
+        must_contain_one_of: ["do not stack", "not stack", "better deal", "best"]
+        description: "Stacking policy still present"
+
+  - id: cp35_spot_check_student_discount
+    prompt: |
+      ## Checkpoint 35: Spot Check
+
+      In a single sentence in WORKPAD.md: what is the CURRENT Student segment discount?
+    checks:
+      - pillar: fidelity
+        must_contain: ["7%"]
+        description: "Student discount current value"
+
+  - id: cp36_spot_check_points_expiration
+    prompt: |
+      ## Checkpoint 36: Spot Check
+
+      In a single sentence in WORKPAD.md: how long do loyalty points currently last before expiring?
+    checks:
+      - pillar: fidelity
+        must_contain: ["18"]
+        description: "Points expiration current value"

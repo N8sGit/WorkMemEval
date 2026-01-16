@@ -42,6 +42,10 @@ def cmd_run(args):
         "simple": Path("tasks/simple_recall.yaml"),
         "shopmind": Path("tasks/shopmind.yaml"),
         "extended": Path("tasks/shopmind_extended.yaml"),
+        "medium": Path("tasks/shopmind_medium.yaml"),
+        "hard": Path("tasks/shopmind_hard.yaml"),
+        "brutal": Path("tasks/shopmind_brutal.yaml"),
+        "marathon": Path("tasks/shopmind_marathon.yaml"),
         "semantic": Path("tasks/shopmind_semantic.yaml"),
     }
     

@@ -77,24 +77,58 @@ class OpenRouterAgent:
             self._secure_file_ops = SecureFileOperations(working_dir, max_file_size=self.max_file_size)
 
         self._ensure_system_message()
-        
+
+        include_history_every_checkpoint = False
+        workpad_visible_in_prompt = True
+        cfg_path = working_dir / "HISTORY_CONFIG.json"
+        if cfg_path.exists():
+            try:
+                cfg = json.loads(cfg_path.read_text())
+                include_history_every_checkpoint = bool(cfg.get("include_history_every_checkpoint", False))
+                workpad_visible_in_prompt = bool(cfg.get("workpad_visible_in_prompt", True))
+            except Exception:
+                include_history_every_checkpoint = False
+                workpad_visible_in_prompt = True
+
+        if include_history_every_checkpoint and self.max_context_messages is None:
+            self.max_context_messages = 6
+        if include_history_every_checkpoint and self.max_context_chars is None:
+            self.max_context_chars = 50000
+
         # Build the full prompt with context
         full_prompt = self._build_prompt(prompt, working_dir, include_history=not self._initialized)
         
         # Add to conversation history
-        self.messages.append({"role": "user", "content": full_prompt})
+        user_message = {"role": "user", "content": full_prompt}
+        self.messages.append(user_message)
         self._initialized = True
         self._prune_messages()
         
         # Call the LLM
         print(f"  [LLM] Calling {self.model}...")
         response = await self._call_llm()
+        if response is None and getattr(self, "_last_llm_error", None) == "context_length":
+            # Retry once with a smaller rolling window to avoid hard failure.
+            keep_first = 1 if self.messages and self.messages[0].get("role") == "system" else 0
+            if keep_first and len(self.messages) > 2:
+                self.messages = [self.messages[0]] + self.messages[-1:]
+            response = await self._call_llm()
         
         if response:
             print(f"  [LLM] Received response ({len(response)} chars)")
-            
+
             # Add response to history
-            self.messages.append({"role": "assistant", "content": response})
+            assistant_content = response
+            if not workpad_visible_in_prompt:
+                import re
+
+                # Make WORKPAD effectively write-only: strip the workpad block from the
+                # stored conversation so the agent can't implicitly reread it.
+                assistant_content = re.sub(r"```workpad\n.*?```", "", assistant_content, flags=re.DOTALL).strip()
+                if not assistant_content:
+                    assistant_content = "(WORKPAD updated.)"
+
+            self.messages.append({"role": "assistant", "content": assistant_content})
             self._prune_messages()
             
             # Extract and write workpad content
@@ -102,6 +136,12 @@ class OpenRouterAgent:
             self._update_workpad(working_dir, workpad_content)
         else:
             print(f"  [LLM] No response received")
+
+        if include_history_every_checkpoint:
+            # Do not retain the full expanded prompt in chat history.
+            # The task already re-injects history/workpad each checkpoint.
+            if isinstance(user_message.get("content"), str):
+                user_message["content"] = prompt
 
     def _prune_messages(self) -> None:
         if not self.messages:
@@ -154,10 +194,28 @@ Example response format:
     def _build_prompt(self, checkpoint_prompt: str, working_dir: Path, include_history: bool) -> str:
         """Build the full prompt including context."""
         parts = []
+
+        include_history_every_checkpoint = False
+        history_include_last_n = 10
+        history_truncate_chars_per_msg = 500
+        workpad_truncate_chars = 0
+        workpad_visible_in_prompt = True
+
+        cfg_path = working_dir / "HISTORY_CONFIG.json"
+        if cfg_path.exists():
+            try:
+                cfg = json.loads(cfg_path.read_text())
+                include_history_every_checkpoint = bool(cfg.get("include_history_every_checkpoint", False))
+                history_include_last_n = int(cfg.get("history_include_last_n", history_include_last_n))
+                history_truncate_chars_per_msg = int(cfg.get("history_truncate_chars_per_msg", history_truncate_chars_per_msg))
+                workpad_truncate_chars = int(cfg.get("workpad_truncate_chars", workpad_truncate_chars))
+                workpad_visible_in_prompt = bool(cfg.get("workpad_visible_in_prompt", workpad_visible_in_prompt))
+            except Exception:
+                pass
         
         # Load history file if exists
         history_path = working_dir / "HISTORY.json"
-        if history_path.exists() and include_history:
+        if history_path.exists() and (include_history or include_history_every_checkpoint):
             try:
                 if self._secure_file_ops:
                     history = json.loads(self._secure_file_ops.read_file("HISTORY.json"))
@@ -165,9 +223,14 @@ Example response format:
                     with open(history_path) as f:
                         history = json.load(f)
                 parts.append("\n--- CONVERSATION HISTORY ---\n")
-                for msg in history[-10:]:  # Last 10 messages for context
+                if history_include_last_n < 1:
+                    history_include_last_n = 1
+                if history_truncate_chars_per_msg < 1:
+                    history_truncate_chars_per_msg = 1
+
+                for msg in history[-history_include_last_n:]:
                     role = msg.get("role", "unknown")
-                    content = msg.get("content", "")[:500]  # Truncate long messages
+                    content = msg.get("content", "")[:history_truncate_chars_per_msg]
                     parts.append(f"[{role}]: {content}\n")
                 parts.append("--- END HISTORY ---\n\n")
             except Exception as e:
@@ -175,12 +238,14 @@ Example response format:
         
         # Current workpad content
         workpad_path = working_dir / "WORKPAD.md"
-        if workpad_path.exists():
+        if workpad_visible_in_prompt and workpad_path.exists():
             if self._secure_file_ops:
                 current_workpad = self._secure_file_ops.read_file("WORKPAD.md")
             else:
                 current_workpad = workpad_path.read_text()
             if current_workpad.strip():
+                if workpad_truncate_chars and workpad_truncate_chars > 0 and len(current_workpad) > workpad_truncate_chars:
+                    current_workpad = current_workpad[-workpad_truncate_chars:]
                 parts.append(f"\n--- CURRENT WORKPAD.md ---\n{current_workpad}\n--- END WORKPAD ---\n\n")
         
         # Check for any injected files mentioned in prompt
@@ -200,6 +265,7 @@ Example response format:
     
     async def _call_llm(self) -> Optional[str]:
         """Call OpenRouter API."""
+        self._last_llm_error = None
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -229,6 +295,11 @@ Example response format:
         except httpx.HTTPStatusError as e:
             print(f"  [LLM] HTTP error: {e.response.status_code}")
             print(f"  [LLM] Response: {e.response.text[:200]}")
+            try:
+                if e.response.status_code == 400 and "maximum context length" in e.response.text.lower():
+                    self._last_llm_error = "context_length"
+            except Exception:
+                pass
             return None
         except Exception as e:
             print(f"  [LLM] Error: {e}")
